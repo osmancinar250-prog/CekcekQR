@@ -49,12 +49,17 @@ with tab1:
         else:
             if supabase:
                 try:
+                    # Türkçe karakter / unicode uyumluluğu için temizleme
+                    clean_name = str(owner_name).strip()
+                    clean_plate = str(plate).strip().upper()
+                    clean_phone = str(owner_phone).strip()
+
                     supabase.table("vehicles").upsert({
-                        "plate": plate,
-                        "owner_name": owner_name,
-                        "owner_phone": owner_phone
+                        "plate": clean_plate,
+                        "owner_name": clean_name,
+                        "owner_phone": clean_phone
                     }).execute()
-                    st.success(f"✅ {plate} plakası sisteme kaydedildi!")
+                    st.success(f"✅ {clean_plate} plakası sisteme kaydedildi!")
                 except Exception as e:
                     st.error(f"Veritabanı kayıt hatası: {e}")
 
