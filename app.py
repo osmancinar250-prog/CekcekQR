@@ -55,6 +55,10 @@ with tab2:
     default_plate = query_params.get("plate", "")
 
     target_plate = st.text_input("Hedef Plaka", value=default_plate, placeholder="Örn: 34ABC123").strip().upper()
+    
+    # Alıcı telefon numarasını doğrudan isteyelim ki hata payı kalmasın
+    destination_phone = st.text_input("Araç Sahibinin WhatsApp Numarası (Ülke koduyla)", placeholder="Örn: 905551234567").strip()
+    
     sender_phone = st.text_input("Sizin Telefon Numaranız (İsteğe Bağlı)", placeholder="Örn: 905321234567").strip()
     
     message_body = st.selectbox("Bildirim Nedeni", [
@@ -64,15 +68,13 @@ with tab2:
     ])
 
     if st.button("WhatsApp Bildirimi Gönder"):
-        if not target_plate:
-            st.error("Lütfen plaka giriniz.")
+        if not target_plate or not destination_phone:
+            st.error("Lütfen plaka ve araç sahibinin telefon numarasını giriniz.")
         else:
-            # WhatsApp token doğrulaması ve gönderimi
             try:
                 WHATSAPP_TOKEN = st.secrets["WHATSAPP_TOKEN"]
                 PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
                 
-                # Test amaçlı varsayılan numara yönlendirmesi
                 url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
                 headers = {
                     "Authorization": f"Bearer {WHATSAPP_TOKEN}",
@@ -85,7 +87,7 @@ with tab2:
 
                 payload = {
                     "messaging_product": "whatsapp",
-                    "to": owner_phone if 'owner_phone' in locals() else "90505426934789", # Test için
+                    "to": destination_phone,
                     "type": "text",
                     "text": {"body": full_text}
                 }
