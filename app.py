@@ -26,6 +26,15 @@ try:
 except Exception:
     supabase = None
 
+# Türkçe karakterleri ASCII güvenli formata çeviren yardımcı fonksiyon
+def safe_str(val):
+    if not val:
+        return ""
+    tr_map = {'ç':'c', 'Ç':'C', 'ğ':'g', 'Ğ':'G', 'ı':'i', 'İ':'I', 'ö':'o', 'Ö':'O', 'ş':'s', 'Ş':'S', 'ü':'u', 'Ü':'U'}
+    for k, v in tr_map.items():
+        val = str(val).replace(k, v)
+    return str(val).encode('ascii', 'ignore').decode('ascii')
+
 st.title("🚗 CekCekQR")
 st.caption("7/24 Bulut Tabanlı Araç Park & İletişim Sistemi")
 
@@ -38,7 +47,7 @@ with tab1:
     st.subheader("Araç Kaydı ve QR Kod Üretimi")
     
     with st.form("register_form"):
-        owner_name = st.text_input("Ad Soyad", placeholder="Örn: Ahmet Demir")
+        owner_name = st.text_input("Ad Soyad", placeholder="Örn: Osman Çınar")
         plate = st.text_input("Araç Plakası", placeholder="Örn: 34ABC123").strip().upper()
         owner_phone = st.text_input("Araç Sahibi WhatsApp No (Ülke koduyla)", placeholder="Örn: 905551234567").strip()
         submit_reg = st.form_submit_button("Kayıt Oluştur ve QR Üret")
@@ -50,13 +59,13 @@ with tab1:
             if supabase:
                 try:
                     supabase.table("vehicles").upsert({
-                        "plate": str(plate),
-                        "owner_name": str(owner_name),
-                        "owner_phone": str(owner_phone)
+                        "plate": safe_str(plate),
+                        "owner_name": safe_str(owner_name),
+                        "owner_phone": safe_str(owner_phone)
                     }).execute()
                     st.success(f"✅ {plate} plakası sisteme kaydedildi!")
                 except Exception as e:
-                    st.warning(f"⚠️ Not: QR kodunuz oluşturuluyor (Veritabanı notu: {e})")
+                    st.warning(f"⚠️ Veritabanı senkronizasyon notu: {e}")
 
             # QR Kodun hedefi canlı bulut uygulaması olacak
             qr_data = f"{BASE_APP_URL}/?plate={plate}"
@@ -98,7 +107,7 @@ with tab2:
             destination_phone = None
             if supabase:
                 try:
-                    res = supabase.table("vehicles").select("owner_phone").eq("plate", target_plate).execute()
+                    res = supabase.table("vehicles").select("owner_phone").eq("plate", safe_str(target_plate)).execute()
                     if res.data and len(res.data) > 0:
                         destination_phone = res.data[0]["owner_phone"]
                 except Exception:
@@ -130,9 +139,9 @@ with tab2:
                         st.success("✅ Bildirim araç sahibine başarıyla iletildi!")
                         if supabase:
                             supabase.table("notifications").insert({
-                                "plate": target_plate,
-                                "sender_phone": sender_phone,
-                                "message": message_body
+                                "plate": safe_str(target_plate),
+                                "sender_phone": safe_str(sender_phone),
+                                "message": str(message_body)
                             }).execute()
                     else:
                         st.error(f"❌ Meta API Hatası: {response.text}")
