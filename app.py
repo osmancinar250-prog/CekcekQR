@@ -5,6 +5,8 @@ from io import BytesIO
 from supabase import create_client, Client
 
 # --- SAYFA YAPILANDIRMASI ---
+st.set_page_config(page_title="CekCekQR - Park Bildirim", page_icon="🚗", layout="centered")
+
 # --- SUPABASE & META AYARLARI (GÜVENLİ YAPI) ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -12,10 +14,8 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 WHATSAPP_TOKEN = st.secrets["WHATSAPP_TOKEN"]
 PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
 
-# Canlı web / bulut uygulama adresin (Streamlit Cloud linkin)
-BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
-
-
+# Canlı web / bulut uygulama adresin
+BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app" 
 
 @st.cache_resource
 def init_supabase() -> Client:
@@ -38,7 +38,7 @@ with tab1:
     st.subheader("Araç Kaydı ve QR Kod Üretimi")
     
     with st.form("register_form"):
-        owner_name = st.text_input("Ad Soyad", placeholder="Örn: Osman Çınar")
+        owner_name = st.text_input("Ad Soyad", placeholder="Örn: Ahmet Demir")
         plate = st.text_input("Araç Plakası", placeholder="Örn: 34ABC123").strip().upper()
         owner_phone = st.text_input("Araç Sahibi WhatsApp No (Ülke koduyla)", placeholder="Örn: 905551234567").strip()
         submit_reg = st.form_submit_button("Kayıt Oluştur ve QR Üret")
@@ -49,19 +49,14 @@ with tab1:
         else:
             if supabase:
                 try:
-                    # Türkçe karakter / unicode uyumluluğu için temizleme
-                    clean_name = str(owner_name).strip()
-                    clean_plate = str(plate).strip().upper()
-                    clean_phone = str(owner_phone).strip()
-
                     supabase.table("vehicles").upsert({
-                        "plate": clean_plate,
-                        "owner_name": clean_name,
-                        "owner_phone": clean_phone
+                        "plate": str(plate),
+                        "owner_name": str(owner_name),
+                        "owner_phone": str(owner_phone)
                     }).execute()
-                    st.success(f"✅ {clean_plate} plakası sisteme kaydedildi!")
+                    st.success(f"✅ {plate} plakası sisteme kaydedildi!")
                 except Exception as e:
-                    st.error(f"Veritabanı kayıt hatası: {e}")
+                    st.warning(f"⚠️ Not: QR kodunuz oluşturuluyor (Veritabanı notu: {e})")
 
             # QR Kodun hedefi canlı bulut uygulaması olacak
             qr_data = f"{BASE_APP_URL}/?plate={plate}"
@@ -83,7 +78,7 @@ with tab1:
 with tab2:
     st.subheader("Araç Sahibine Bildirim Gönder")
     
-    # URL'den gelen plaka parametresini yakala (QR okutulunca otomatik dolması için)
+    # URL'den gelen plaka parametresini yakala
     query_params = st.query_params
     default_plate = query_params.get("plate", "")
 
