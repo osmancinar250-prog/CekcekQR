@@ -5,17 +5,17 @@ from io import BytesIO
 from supabase import create_client, Client
 
 # --- SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="CekCekQR - Park Bildirim", page_icon="🚗", layout="centered")
+# --- SUPABASE & META AYARLARI (GÜVENLİ YAPI) ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-# --- SUPABASE & META AYARLARI ---
-SUPABASE_URL = "https://sb_publishable_LfA41j4Or3BBOkFpksuZdg_UcoopgRa.supabase.co"
-SUPABASE_KEY = "sb_secret_FQ3291P56D3Gg9IfCnthNA_vWMveMyM"
+WHATSAPP_TOKEN = st.secrets["WHATSAPP_TOKEN"]
+PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
 
-WHATSAPP_TOKEN = "EAAUPT0J61BoBSjJJMRO9PSurQNfqaDZBmRI4xgwPVeBWsmmFMvZCzd89MgJbsoi38GZBCOeNK5XgLZCoHPA5YoIVmid1Oc0TCsTWHusw1crdGP9zgm8hshRtZAh5tQ7fmmn2oozHN5FZCUeU1UDvjCZAfuZAxlZBVWeZA2WHclFfk0tprHO993elrM848m79595wcmXmTFcD1STZArXMPZAZBn6dbPdDenQFAqTwrkbMd4DYiSjuUDwOr9xbcOHFy9yMZC65Skc34HpZC0yIZBoHWeROhhKhEDBk"
-PHONE_NUMBER_ID = "1376850275513325"
+# Canlı web / bulut uygulama adresin (Streamlit Cloud linkin)
+BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
 
-# Canlı web / bulut uygulama adresin (Streamlit Cloud veya sunucu linkin)
-BASE_APP_URL = "https://cekcekqr.streamlit.app" 
+
 
 @st.cache_resource
 def init_supabase() -> Client:
