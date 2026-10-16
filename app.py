@@ -16,6 +16,15 @@ PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
 # Canlı web / bulut uygulama adresin
 BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app" 
 
+# Türkçe karakterleri ASCII güvenli formata çeviren yardımcı fonksiyon
+def safe_str(val):
+    if not val:
+        return ""
+    tr_map = {'ç':'c', 'Ç':'C', 'ğ':'g', 'Ğ':'G', 'ı':'i', 'İ':'I', 'ö':'o', 'Ö':'O', 'ş':'s', 'Ş':'S', 'ü':'u', 'Ü':'U'}
+    for k, v in tr_map.items():
+        val = str(val).replace(k, v)
+    return str(val).encode('ascii', 'ignore').decode('ascii')
+
 st.title("🚗 CekCekQR")
 st.caption("7/24 Bulut Tabanlı Araç Park & İletişim Sistemi")
 
@@ -37,7 +46,7 @@ with tab1:
         if not plate or not owner_phone:
             st.error("Lütfen plaka ve telefon numarasını giriniz.")
         else:
-            # Doğrudan Supabase REST API ile kayıt (Upsert)
+            # Doğrudan Supabase REST API ile güvenli kayıt (Upsert)
             try:
                 rest_url = f"{SUPABASE_URL}/rest/v1/vehicles"
                 headers = {
@@ -47,9 +56,9 @@ with tab1:
                     "Prefer": "resolution=merge-conflict"
                 }
                 payload = {
-                    "plate": plate,
-                    "owner_name": owner_name,
-                    "owner_phone": owner_phone
+                    "plate": safe_str(plate),
+                    "owner_name": safe_str(owner_name),
+                    "owner_phone": safe_str(owner_phone)
                 }
                 res = requests.post(rest_url, headers=headers, json=payload)
                 if res.status_code in [200, 201, 204]:
@@ -97,7 +106,8 @@ with tab2:
         else:
             destination_phone = None
             try:
-                rest_url = f"{SUPABASE_URL}/rest/v1/vehicles?plate=eq.{target_plate}&select=owner_phone"
+                safe_target = safe_str(target_plate)
+                rest_url = f"{SUPABASE_URL}/rest/v1/vehicles?plate=eq.{safe_target}&select=owner_phone"
                 headers = {
                     "apikey": SUPABASE_KEY,
                     "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -143,9 +153,9 @@ with tab2:
                                 "Content-Type": "application/json"
                             }
                             log_payload = {
-                                "plate": target_plate,
-                                "sender_phone": sender_phone,
-                                "message": message_body
+                                "plate": safe_str(target_plate),
+                                "sender_phone": safe_str(sender_phone),
+                                "message": safe_str(message_body)
                             }
                             requests.post(log_url, headers=log_headers, json=log_payload)
                         except Exception:
