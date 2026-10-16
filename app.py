@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import qrcode
 from io import BytesIO
-from supabase import create_client, Client
 
 # --- SAYFA YAPILANDIRMASI ---
 st.set_page_config(page_title="CekCekQR - Park Bildirim", page_icon="🚗", layout="centered")
@@ -16,24 +15,6 @@ PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
 
 # Canlı web / bulut uygulama adresin
 BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app" 
-
-@st.cache_resource
-def init_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-try:
-    supabase = init_supabase()
-except Exception:
-    supabase = None
-
-# Türkçe karakterleri ASCII güvenli formata çeviren yardımcı fonksiyon
-def safe_str(val):
-    if not val:
-        return ""
-    tr_map = {'ç':'c', 'Ç':'C', 'ğ':'g', 'Ğ':'G', 'ı':'i', 'İ':'I', 'ö':'o', 'Ö':'O', 'ş':'s', 'Ş':'S', 'ü':'u', 'Ü':'U'}
-    for k, v in tr_map.items():
-        val = str(val).replace(k, v)
-    return str(val).encode('ascii', 'ignore').decode('ascii')
 
 st.title("🚗 CekCekQR")
 st.caption("7/24 Bulut Tabanlı Araç Park & İletişim Sistemi")
@@ -56,16 +37,27 @@ with tab1:
         if not plate or not owner_phone:
             st.error("Lütfen plaka ve telefon numarasını giriniz.")
         else:
-            if supabase:
-                try:
-                    supabase.table("vehicles").upsert({
-                        "plate": safe_str(plate),
-                        "owner_name": safe_str(owner_name),
-                        "owner_phone": safe_str(owner_phone)
-                    }).execute()
-                    st.success(f"✅ {plate} plakası sisteme kaydedildi!")
-                except Exception as e:
-                    st.warning(f"⚠️ Veritabanı senkronizasyon notu: {e}")
+            # Doğrudan Supabase REST API ile kayıt (Upsert)
+            try:
+                rest_url = f"{SUPABASE_URL}/rest/v1/vehicles"
+                headers = {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-conflict"
+                }
+                payload = {
+                    "plate": plate,
+                    "owner_name": owner_name,
+                    "owner_phone": owner_phone
+                }
+                res = requests.post(rest_url, headers=headers, json=payload)
+                if res.status_code in [200, 201, 204]:
+                    st.success(f"✅ {plate} plakası sisteme başarıyla kaydedildi!")
+                else:
+                    st.warning(f"⚠️ Kayıt uyarısı: {res.text}")
+            except Exception as e:
+                st.warning(f"⚠️ Veritabanı bağlantı notu: {e}")
 
             # QR Kodun hedefi canlı bulut uygulaması olacak
             qr_data = f"{BASE_APP_URL}/?plate={plate}"
@@ -87,7 +79,6 @@ with tab1:
 with tab2:
     st.subheader("Araç Sahibine Bildirim Gönder")
     
-    # URL'den gelen plaka parametresini yakala
     query_params = st.query_params
     default_plate = query_params.get("plate", "")
 
@@ -105,13 +96,19 @@ with tab2:
             st.error("Lütfen plaka giriniz.")
         else:
             destination_phone = None
-            if supabase:
-                try:
-                    res = supabase.table("vehicles").select("owner_phone").eq("plate", safe_str(target_plate)).execute()
-                    if res.data and len(res.data) > 0:
-                        destination_phone = res.data[0]["owner_phone"]
-                except Exception:
-                    pass
+            try:
+                rest_url = f"{SUPABASE_URL}/rest/v1/vehicles?plate=eq.{target_plate}&select=owner_phone"
+                headers = {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_KEY}"
+                }
+                res = requests.get(rest_url, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    if data and len(data) > 0:
+                        destination_phone = data[0]["owner_phone"]
+            except Exception:
+                pass
 
             if not destination_phone:
                 st.error("Bu plaka sistemde kayıtlı değil! Önce 1. sekmeden kaydetmelisiniz.")
@@ -137,12 +134,22 @@ with tab2:
                     response = requests.post(url, headers=headers, json=payload)
                     if response.status_code == 200:
                         st.success("✅ Bildirim araç sahibine başarıyla iletildi!")
-                        if supabase:
-                            supabase.table("notifications").insert({
-                                "plate": safe_str(target_plate),
-                                "sender_phone": safe_str(sender_phone),
-                                "message": str(message_body)
-                            }).execute()
+                        # Loglama
+                        try:
+                            log_url = f"{SUPABASE_URL}/rest/v1/notifications"
+                            log_headers = {
+                                "apikey": SUPABASE_KEY,
+                                "Authorization": f"Bearer {SUPABASE_KEY}",
+                                "Content-Type": "application/json"
+                            }
+                            log_payload = {
+                                "plate": target_plate,
+                                "sender_phone": sender_phone,
+                                "message": message_body
+                            }
+                            requests.post(log_url, headers=log_headers, json=log_payload)
+                        except Exception:
+                            pass
                     else:
                         st.error(f"❌ Meta API Hatası: {response.text}")
                 except Exception as e:
@@ -153,12 +160,20 @@ with tab2:
 # ---------------------------------------------------------
 with tab3:
     st.subheader("WhatsApp Bildirim Hareketleri")
-    if supabase:
-        try:
-            logs = supabase.table("notifications").select("*").order("created_at", desc=True).execute()
-            if logs.data:
-                st.dataframe(logs.data)
+    try:
+        rest_url = f"{SUPABASE_URL}/rest/v1/notifications?select=*&order=created_at.desc"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+        res = requests.get(rest_url, headers=headers)
+        if res.status_code == 200:
+            logs = res.json()
+            if logs:
+                st.dataframe(logs)
             else:
                 st.info("Henüz geçmiş kayıt yok.")
-        except Exception:
-            st.info("Tablo henüz oluşturulmamış olabilir.")
+        else:
+            st.info("Tablo verileri alınamadı.")
+    except Exception:
+        st.info("Tablo henüz oluşturulmamış olabilir.")
