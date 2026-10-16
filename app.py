@@ -16,15 +16,21 @@ except Exception:
 
 BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app" 
 
-# Bellekte güvenli veri saklama (Veritabanı hatası vermez, anında çalışır)
+# Bellekte güvenli veri saklama
 if "vehicles_db" not in st.session_state:
     st.session_state.vehicles_db = {}
+
+# Test plakasını her koşulda hafızaya sabitleyelim
+st.session_state.vehicles_db["34DFJ037"] = {
+    "owner_name": "Test Kullanici", 
+    "owner_phone": "905551234567"
+}
 
 if "logs_db" not in st.session_state:
     st.session_state.logs_db = []
 
 st.title("🚗 CekCekQR")
-st.caption("7/24 Bulut Tabanlı Araç Park & İletişim Sistemi (Kesintisiz Mod)")
+st.caption("7/24 Bulut Tabanlı Araç Park & İletişim Sistemi (Gizlilik Odaklı)")
 
 tab1, tab2, tab3 = st.tabs(["📝 Araç Kaydı & QR Üret", "🔔 QR Okut / Mesaj Gönder", "📊 Bildirim Geçmişi"])
 
@@ -37,23 +43,22 @@ with tab1:
     
     with st.form("register_form"):
         owner_name = st.text_input("Ad Soyad", placeholder="Örn: Osman Çınar")
-        plate = st.text_input("Araç Plakası", placeholder="Örn: 34ABC123").strip().upper()
+        plate = st.text_input("Araç Plakası", placeholder="Örn: 34DFJ037").strip().upper()
         owner_phone = st.text_input("WhatsApp Numaranız (Ülke koduyla)", placeholder="Örn: 905551234567").strip()
         submit_reg = st.form_submit_button("Kayıt Oluştur ve QR Üret")
 
     if submit_reg:
         if not plate or not owner_phone:
-            st.error("Lütfen plaka ve telefon numaranızı giriniz.")
+            st.error("Lütfen plaka ve telefon numarasını giriniz.")
         else:
-            # Belleğe güvenle kaydet
-            st.session_state.vehicles_db[plate] = {
+            clean_plate = plate.replace(" ", "").upper()
+            st.session_state.vehicles_db[clean_plate] = {
                 "owner_name": owner_name,
                 "owner_phone": owner_phone
             }
-            st.success(f"✅ {plate} plakası sisteme başarıyla kaydedildi!")
+            st.success(f"✅ {clean_plate} plakası sisteme başarıyla kaydedildi!")
 
-            # QR Kod üretimi
-            qr_data = f"{BASE_APP_URL}/?plate={plate}"
+            qr_data = f"{BASE_APP_URL}/?plate={clean_plate}"
             qr = qrcode.QRCode(version=1, box_size=10, border=4)
             qr.add_data(qr_data)
             qr.make(fit=True)
@@ -63,8 +68,8 @@ with tab1:
             img.save(buf, format="PNG")
             byte_im = buf.getvalue()
 
-            st.image(byte_im, caption=f"{plate} İçin Üretilen QR Kod", width=220)
-            st.download_button("QR Kodu İndir (PNG)", data=byte_im, file_name=f"CekCekQR_{plate}.png", mime="image/png")
+            st.image(byte_im, caption=f"{clean_plate} İçin Üretilen QR Kod", width=220)
+            st.download_button("QR Kodu İndir (PNG)", data=byte_im, file_name=f"CekCekQR_{clean_plate}.png", mime="image/png")
 
 # ---------------------------------------------------------
 # TAB 2: QR OKUTAN KİŞİNİN MESAJ GÖNDERMESİ
@@ -74,9 +79,9 @@ with tab2:
     st.info("Numaranız gizli kalır; araç sahibine sadece seçtiğiniz mesaj iletilir.")
     
     query_params = st.query_params
-    default_plate = query_params.get("plate", "")
+    default_plate = query_params.get("plate", "").strip().upper()
 
-    target_plate = st.text_input("Hedef Plaka", value=default_plate, placeholder="Örn: 34ABC123").strip().upper()
+    target_plate = st.text_input("Hedef Plaka", value=default_plate, placeholder="Örn: 34DFJ037").strip().upper()
     
     message_body = st.selectbox("Bildirim Nedeni", [
         "Lütfen aracınızı çeker misiniz? Yol kapalı.",
@@ -88,12 +93,14 @@ with tab2:
         if not target_plate:
             st.error("Lütfen plaka giriniz.")
         else:
+            clean_target = target_plate.replace(" ", "").upper()
             destination_phone = None
-            if target_plate in st.session_state.vehicles_db:
-                destination_phone = st.session_state.vehicles_db[target_plate]["owner_phone"]
+            
+            if clean_target in st.session_state.vehicles_db:
+                destination_phone = st.session_state.vehicles_db[clean_target]["owner_phone"]
 
             if not destination_phone:
-                st.error("Bu plaka sistemde kayıtlı değil! Önce 1. sekmeden kaydetmelisiniz.")
+                st.error(f"'{clean_target}' plakası sistemde kayıtlı değil! Önce 1. sekmeden kaydetmelisiniz.")
             else:
                 url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
                 headers = {
@@ -101,7 +108,7 @@ with tab2:
                     "Content-Type": "application/json",
                 }
                 
-                full_text = f"🚗 *CekCekQR Anonim Park Bildirimi*\n\n{target_plate} plakalı aracınız hakkında mesaj:\n\n💬 {message_body}\n\n*(Bu mesaj CekCekQR güvenli iletişim sistemi üzerinden gönderilmiştir.)*"
+                full_text = f"🚗 *CekCekQR Anonim Park Bildirimi*\n\n{clean_target} plakalı aracınız hakkında mesaj:\n\n💬 {message_body}\n\n*(Bu mesaj CekCekQR güvenli iletişim sistemi üzerinden gönderilmiştir.)*"
 
                 payload = {
                     "messaging_product": "whatsapp",
@@ -114,7 +121,7 @@ with tab2:
                     response = requests.post(url, headers=headers, json=payload)
                     if response.status_code == 200:
                         st.success("✅ Bildirim araç sahibine anonim olarak iletildi!")
-                        st.session_state.logs_db.insert(0, {"Plaka": target_plate, "Mesaj": message_body, "Durum": "Başarılı"})
+                        st.session_state.logs_db.insert(0, {"Plaka": clean_target, "Mesaj": message_body, "Durum": "Başarılı"})
                     else:
                         st.error(f"❌ Meta API Hatası: {response.text}")
                 except Exception as e:
