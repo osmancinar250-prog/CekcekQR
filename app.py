@@ -2,15 +2,17 @@ import streamlit as st
 import qrcode
 from io import BytesIO
 from supabase import create_client
+import requests
 import datetime
 
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
 # ---------------------------------------------------------
-st.set_page_config(page_title="CekCekQR - Park İletişim Sistemi", page_icon="🚗", layout="centered")
+st.set_page_config(page_title="CekCekQR - Telegram Park Bildirimi", page_icon="🚗", layout="centered")
 
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
 
 APP_BASE_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
 
@@ -19,24 +21,35 @@ def init_supabase():
     if SUPABASE_URL and SUPABASE_KEY:
         try:
             return create_client(SUPABASE_URL, SUPABASE_KEY)
-        except Exception as e:
-            st.error(f"Supabase Bağlantı Hatası: {e}")
+        except Exception:
             return None
     return None
 
 supabase = init_supabase()
 
+def send_telegram_message(chat_id, text):
+    """Telegram API üzerinden kilit ekranı bildirimi gönderir."""
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    try:
+        res = requests.post(url, json=payload, timeout=5)
+        return res.status_code == 200
+    except Exception:
+        return False
+
 # ---------------------------------------------------------
-# HEADER
+# ARAYÜZ BAŞLIĞI
 # ---------------------------------------------------------
 st.title("🚗 CekCekQR")
-st.caption("Anonim Güvenli Park İletişim Platformu")
+st.caption("Telegram Entegrasyonlu Anlık Park İletişim Sistemi")
 
 query_params = st.query_params
 qr_vehicle_id = query_params.get("v", None)
 
 # ---------------------------------------------------------
-# SENARYO A: QR KOD OKUTULDU (Sokaktaki Vatandaş)
+# SENARYO A: QR KOD OKUTULDU (Bildiren Kişi)
 # ---------------------------------------------------------
 if qr_vehicle_id:
     st.subheader("📢 Araç Sahibine Bildirim Gönder")
@@ -47,138 +60,92 @@ if qr_vehicle_id:
             res = supabase.table("vehicles").select("*").eq("id", qr_vehicle_id).execute()
             vehicle = res.data[0] if res.data else None
         except Exception as e:
-            st.error(f"Veri çekme hatası (Supabase RLS kısıtlaması olabilir): {e}")
+            st.error(f"Veri çekme hatası: {e}")
 
     if vehicle:
         st.success(f"✅ Araç Doğrulandı: **{vehicle['plate']}**")
-        st.info("🔒 İletişim anonimdir. Telefon numaranız karşı tarafa gösterilmez.")
-
+        
+        sender_phone = st.text_input("Telefon Numaranız (Yasal doğrulama için saklanır, karşı tarafa gösterilmez):", placeholder="05XXXXXXXXX")
+        
         preset_messages = [
             "⚠️ Aracınız geçişi/çıkışı engelliyor.",
             "💡 Aracınızın farları açık kaldı.",
             "🪟 Aracınızın camı açık kaldı.",
             "💥 Aracınıza temas/hasar gerçekleşti."
         ]
-        selected_msg = st.radio("Lütfen durum seçiniz:", preset_messages)
+        selected_msg = st.radio("Durum seçiniz:", preset_messages)
 
         if st.button("🚨 Bildirimi Gönder"):
-            try:
-                notif_data = {
-                    "vehicle_id": qr_vehicle_id,
-                    "incoming_preset": selected_msg,
-                    "status": "BEKLIYOR",
-                    "created_at": datetime.datetime.now().isoformat()
-                }
-                supabase.table("notifications").insert(notif_data).execute()
-                st.success("✅ Bildirim iletildi! Araç sahibinin yanıtı aşağıda görünecektir.")
-            except Exception as e:
-                st.error(f"Bildirim gönderilemedi: {e}")
-
-        # --- CANLI TAKİP EKRANI ---
-        st.markdown("---")
-        st.subheader("📊 Yanıt Takibi")
-        
-        try:
-            latest_notif = supabase.table("notifications")\
-                .select("*")\
-                .eq("vehicle_id", qr_vehicle_id)\
-                .order("created_at", desc=True)\
-                .limit(1)\
-                .execute()
-            
-            if latest_notif.data:
-                notif = latest_notif.data[0]
-                status = notif.get("status", "BEKLIYOR")
-                
-                if status == "BEKLIYOR":
-                    st.warning("⏳ **Süreç Durumu:** Araç sahibinin yanıtı bekleniyor...")
-                elif status == "YANITLANDI":
-                    st.success(f"💬 **Araç Sahibi Yanıtı:** {notif.get('outgoing_preset')}")
-                
-                if st.button("🔄 Yanıtı Kontrol Et"):
-                    st.rerun()
-        except Exception as e:
-            st.caption("Takip verisi alınamadı.")
+            if sender_phone.strip():
+                try:
+                    # 1. Veritabanına Kaydet
+                    notif_data = {
+                        "vehicle_id": qr_vehicle_id,
+                        "incoming_preset": selected_msg,
+                        "sender_phone": sender_phone.strip(),
+                        "status": "BEKLIYOR",
+                        "created_at": datetime.datetime.now().isoformat()
+                    }
+                    supabase.table("notifications").insert(notif_data).execute()
+                    
+                    # 2. Telegram Üzerinden Araç Sahibine Anında Kilit Ekranı Bildirimi Gönder
+                    telegram_chat_id = vehicle.get("telegram_chat_id")
+                    if telegram_chat_id:
+                        msg_text = (
+                            f"🚨 **CekCekQR BİLDİRİMİ!**\n\n"
+                            f"🚗 **Plaka:** {vehicle['plate']}\n"
+                            f"💬 **Mesaj:** {selected_msg}\n\n"
+                            f"📱 *Bildirim kilit ekranınıza ulaştırıldı.*"
+                        )
+                        send_telegram_message(telegram_chat_id, msg_text)
+                    
+                    st.success("✅ Bildirim araç sahibinin Telegram'ına kilit ekranı uyarısı olarak gönderildi!")
+                except Exception as e:
+                    st.error(f"Bildirim hatası: {e}")
+            else:
+                st.warning("Lütfen telefon numaranızı giriniz.")
 
     else:
         st.error("Geçersiz veya veritabanında bulunmayan QR Kod.")
 
 # ---------------------------------------------------------
-# SENARYO B: ARAÇ SAHİBİ PANELİ
+# SENARYO B: ARAÇ SAHİBİ PANELİ (Kayıt & QR Üretme)
 # ---------------------------------------------------------
 else:
-    tab1, tab2 = st.tabs(["📝 Araç Kaydı & QR Üret", "📲 Gelen Bildirimlerim"])
+    st.subheader("📝 Araç Kaydı & QR Kod Oluştur")
+    
+    plate = st.text_input("Plakanız:", placeholder="34ABC123").upper().replace(" ", "")
+    phone = st.text_input("Telefon Numaranız (Yasal Doğrulama):", placeholder="05XXXXXXXXX")
+    
+    st.markdown("---")
+    st.markdown("### 📲 Kilit Ekranı Bildirimi İçin Telegram Eşleşmesi")
+    st.info("Kilit ekranında bildirim alabilmek için Telegram Botumuza tıkla, `/start` de ve sana verilen Chat ID numarasını aşağıya yapıştır.")
+    
+    chat_id_input = st.text_input("Telegram Chat ID (Örn: 123456789):")
 
-    with tab1:
-        st.subheader("Yeni Araç Kaydı")
-        st.caption("KVKK gereği telefon numaranız yasal doğrulama için saklanır, dışarıyla paylaşılmaz.")
-        
-        plate = st.text_input("Plakanız:", placeholder="34ABC123").upper().replace(" ", "")
-        phone = st.text_input("Telefon Numaranız (Yasal Doğrulama İçin):", placeholder="05XXXXXXXXX")
-        
-        if st.button("QR Kod Oluştur"):
-            if plate and phone:
-                if supabase:
-                    try:
-                        v_data = {"plate": plate, "phone": phone}
-                        res = supabase.table("vehicles").insert(v_data).execute()
+    if st.button("QR Kod Oluştur"):
+        if plate and phone and chat_id_input:
+            if supabase:
+                try:
+                    v_data = {
+                        "plate": plate, 
+                        "phone": phone.strip(),
+                        "telegram_chat_id": chat_id_input.strip()
+                    }
+                    res = supabase.table("vehicles").insert(v_data).execute()
+                    
+                    if res.data:
+                        new_id = res.data[0]["id"]
+                        app_url = f"{APP_BASE_URL}/?v={new_id}"
                         
-                        if res.data:
-                            new_id = res.data[0]["id"]
-                            app_url = f"{APP_BASE_URL}/?v={new_id}"
-                            
-                            qr = qrcode.make(app_url)
-                            buf = BytesIO()
-                            qr.save(buf)
-                            
-                            st.success(f"✅ {plate} plakalı araç başarıyla kaydedildi!")
-                            st.image(buf.getvalue(), caption=f"{plate} QR Kodu", width=250)
-                            st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
-                        else:
-                            st.error("Kayıt oluşturulamadı. Lütfen Supabase RLS izinlerini kontrol edin.")
-                    except Exception as e:
-                        st.error(f"Veritabanı kayıt hatası: {e}")
-            else:
-                st.warning("Lütfen hem plaka hem de telefon numaranızı giriniz.")
-
-    with tab2:
-        st.subheader("Gelen Bildirim Sorgulama")
-        search_plate = st.text_input("Plakanızı Girin:", placeholder="34ABC123").upper().replace(" ", "")
-        
-        if search_plate and supabase:
-            try:
-                v_res = supabase.table("vehicles").select("*").eq("plate", search_plate).execute()
-                
-                if v_res.data:
-                    vehicle_obj = v_res.data[0]
-                    
-                    notifs = supabase.table("notifications")\
-                        .select("*")\
-                        .eq("vehicle_id", vehicle_obj["id"])\
-                        .order("created_at", desc=True)\
-                        .execute()
-                    
-                    if notifs.data:
-                        for n in notifs.data:
-                            st.write(f"📌 **Tarih:** {n['created_at'][:16].replace('T', ' ')} | **Mesaj:** {n['incoming_preset']}")
-                            
-                            cols = st.columns(3)
-                            if cols[0].button("🟢 5 Dk'ya Geliyorum", key=f"r1_{n['id']}"):
-                                supabase.table("notifications").update({"outgoing_preset": "5 Dk içinde geliyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
-                                st.rerun()
-                            if cols[1].button("🟡 Aracı Çekiyorum", key=f"r2_{n['id']}"):
-                                supabase.table("notifications").update({"outgoing_preset": "Hemen aracı çekiyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
-                                st.rerun()
-                            if cols[2].button("🔴 Gecikeceğim", key=f"r3_{n['id']}"):
-                                supabase.table("notifications").update({"outgoing_preset": "15-20 dakika gecikeceğim.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
-                                st.rerun()
-                            
-                            if n.get("outgoing_preset"):
-                                st.info(f"Verilen Yanıt: {n['outgoing_preset']}")
-                            st.markdown("---")
-                    else:
-                        st.info("Bu araç için gelen aktif bir bildirim yok.")
-                else:
-                    st.error("Bu plakaya ait kayıt bulunamadı.")
-            except Exception as e:
-                st.error(f"Sorgulama hatası: {e}")
+                        qr = qrcode.make(app_url)
+                        buf = BytesIO()
+                        qr.save(buf)
+                        
+                        st.success(f"✅ {plate} plakalı araç başarıyla kaydedildi!")
+                        st.image(buf.getvalue(), caption=f"{plate} QR Kodu", width=250)
+                        st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
+                except Exception as e:
+                    st.error(f"Kayıt Hatası (Supabase'e 'telegram_chat_id' sütununu eklediğinizden emin olun): {e}")
+        else:
+            st.warning("Lütfen plaka, telefon ve Telegram Chat ID alanlarının tamamını doldurunuz.")
