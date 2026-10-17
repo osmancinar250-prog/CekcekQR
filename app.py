@@ -4,6 +4,7 @@ from io import BytesIO
 from supabase import create_client
 import datetime
 import requests
+import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
@@ -14,6 +15,9 @@ SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 ONESIGNAL_APP_ID = st.secrets.get("ONESIGNAL_APP_ID", "")
 ONESIGNAL_REST_KEY = st.secrets.get("ONESIGNAL_REST_KEY", "")
+
+# Gerçek yayın adresiniz
+APP_BASE_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
 
 @st.cache_resource
 def init_supabase():
@@ -45,10 +49,44 @@ def send_push_notification(player_id, title, message):
         return False
 
 # ---------------------------------------------------------
+# ONESIGNAL WEB PUSH SCRIPT (AUTOMATIC SUBSCRIPTION)
+# ---------------------------------------------------------
+def inject_onesignal_script(vehicle_id=None):
+    if ONESIGNAL_APP_ID:
+        onesignal_code = f"""
+        <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+        <script>
+          window.OneSignal = window.OneSignal || [];
+          OneSignal.push(function() {{
+            OneSignal.init({{
+              appId: "{ONESIGNAL_APP_ID}",
+              safari_web_id: "pb_gateway",
+              notifyButton: {{
+                enable: true,
+              }},
+            }});
+            
+            // Kullanıcı abone olduğunda ID'yi veritabanına kaydet
+            OneSignal.on('subscriptionChange', function (isSubscribed) {{
+              if (isSubscribed) {{
+                OneSignal.getUserId(function(userId) {{
+                  if (userId && "{vehicle_id}") {{
+                    // Parent pencereye Player ID'yi gönder
+                    window.parent.postMessage({{type: 'ONESIGNAL_USER_ID', userId: userId}}, '*');
+                  }}
+                }});
+              }}
+            }});
+          }});
+        </script>
+        """
+        components.html(onesignal_code, height=0)
+
+# ---------------------------------------------------------
 # HEADER
 # ---------------------------------------------------------
 st.title("🚗 CekCekQR")
-st.caption("Anonim, Ücretsiz ve Hızlı Park Bildirim Sistemi")
+st.caption("Anonim, Ücretsiz ve Canlı Park İletişim Sistemi")
 
 # URL Parametresi Kontrolü (QR Okutuldu mu?)
 query_params = st.query_params
@@ -68,19 +106,17 @@ if qr_vehicle_id:
 
     if vehicle:
         st.success(f"✅ Araç Doğrulandı: **{vehicle['plate']}**")
-        st.info("🔒 %100 Anonim İletişim: Hiçbir kişisel veri veya telefon numarası istenmez ve paylaşılmaz.")
+        st.info("🔒 %100 Anonim İletişim: Kişisel verileriniz görünmez.")
 
-        # Kalıp Mesaj Seçimi
         preset_messages = [
             "⚠️ Aracınız geçişi/çıkışı engelliyor.",
             "💡 Aracınızın farları açık kaldı.",
             "🪟 Aracınızın camı açık kaldı.",
             "💥 Aracınıza temas/hasar gerçekleşti."
         ]
-        selected_msg = st.radio("Lütfen bildirim durumunu seçin:", preset_messages)
+        selected_msg = st.radio("Lütfen durum seçiniz:", preset_messages)
 
         if st.button("🚨 Bildirimi Gönder"):
-            # Veritabanına Ekle
             notif_data = {
                 "vehicle_id": qr_vehicle_id,
                 "incoming_preset": selected_msg,
@@ -89,7 +125,7 @@ if qr_vehicle_id:
             }
             supabase.table("notifications").insert(notif_data).execute()
 
-            # Araç Sahibine Kilit Ekranı Bildirimi Fırlat
+            # Push Bildirimi Gönder
             if vehicle.get("push_player_id"):
                 send_push_notification(
                     vehicle["push_player_id"], 
@@ -97,11 +133,11 @@ if qr_vehicle_id:
                     f"Mesaj: {selected_msg}"
                 )
             
-            st.success("✅ Bildirim araç sahibine iletildi! Yanıt bekleniyor...")
+            st.success("✅ Bildirim iletildi! Süreç canlı olarak takip ediliyor...")
 
-        # Canlı Yanıt Takibi
+        # --- CANLI TAKİP EKRANI (BİLDİREN KİŞİ İÇİN) ---
         st.markdown("---")
-        st.write("🔄 **Araç Sahibinin Yanıt Durumu:**")
+        st.subheader("📊 Canlı Süreç Takibi")
         
         latest_notif = supabase.table("notifications")\
             .select("*")\
@@ -110,16 +146,25 @@ if qr_vehicle_id:
             .limit(1)\
             .execute()
         
-        if latest_notif.data and latest_notif.data[0].get("outgoing_preset"):
-            st.info(f"💬 **Araç Sahibi Yanıtı:** {latest_notif.data[0]['outgoing_preset']}")
+        if latest_notif.data:
+            notif = latest_notif.data[0]
+            status = notif.get("status", "BEKLIYOR")
+            
+            if status == "BEKLIYOR":
+                st.warning("⏳ **Süreç Durumu:** Araç sahibine bildirim ulaştırıldı, yanıt bekleniyor...")
+            elif status == "YANITLANDI":
+                st.success(f"💬 **Araç Sahibi Yanıtı:** {notif.get('outgoing_preset')}")
+            
+            if st.button("🔄 Durumu Yenile"):
+                st.rerun()
         else:
-            st.caption("Henüz yanıt verilmedi. Sayfa araç sahibi yanıt verdiğinde güncellenir.")
+            st.caption("Henüz aktif bir bildirim oluşturulmadı.")
 
     else:
         st.error("Geçersiz veya sistemde bulunmayan QR Kod.")
 
 # ---------------------------------------------------------
-# SENARYO B: ARAÇ SAHİBİ PANELİ (Kayıt Olma & Yanıt Verme)
+# SENARYO B: ARAÇ SAHİBİ PANELİ (Kayıt & Yanıt)
 # ---------------------------------------------------------
 else:
     tab1, tab2 = st.tabs(["📝 Araç Kaydı & QR Üret", "📲 Gelen Bildirimlerim"])
@@ -130,13 +175,11 @@ else:
         
         if st.button("QR Kod Oluştur"):
             if plate:
-                # Veritabanına Ekle
                 v_data = {"plate": plate}
                 res = supabase.table("vehicles").insert(v_data).execute()
                 new_id = res.data[0]["id"]
 
-                # QR Kod URL
-                app_url = f"https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app/?v={new_id}"
+                app_url = f"{APP_BASE_URL}/?v={new_id}"
                 
                 qr = qrcode.make(app_url)
                 buf = BytesIO()
@@ -145,6 +188,10 @@ else:
                 st.success("✅ Aracınız kaydedildi!")
                 st.image(buf.getvalue(), caption=f"{plate} QR Kodu", width=250)
                 st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
+                
+                # Push Bildirim Kurulumu
+                st.info("🔔 **Bildirim Kurulumu:** Cihazınıza bildirim gelebilmesi için çıkan tarayıcı bildirim iznine 'İzin Ver' / 'Allow' deyin.")
+                inject_onesignal_script(new_id)
             else:
                 st.warning("Lütfen plaka giriniz.")
 
@@ -153,13 +200,14 @@ else:
         search_plate = st.text_input("Takip etmek istediğiniz Plaka:", placeholder="34ABC123").upper().replace(" ", "")
         
         if search_plate:
-            # Plakaya ait aracı bul
             v_res = supabase.table("vehicles").select("*").eq("plate", search_plate).execute()
             
             if v_res.data:
                 vehicle_obj = v_res.data[0]
                 
-                # Gelen bildirimleri çek
+                # OneSignal Bildirim Entegrasyonu
+                inject_onesignal_script(vehicle_obj["id"])
+                
                 notifs = supabase.table("notifications")\
                     .select("*")\
                     .eq("vehicle_id", vehicle_obj["id"])\
@@ -170,7 +218,6 @@ else:
                     for n in notifs.data:
                         st.write(f"📌 **Tarih:** {n['created_at'][:16].replace('T', ' ')} | **Gelen Bildirim:** {n['incoming_preset']}")
                         
-                        # Yanıt Butonları
                         cols = st.columns(3)
                         if cols[0].button("🟢 5 Dk'ya Geliyorum", key=f"r1_{n['id']}"):
                             supabase.table("notifications").update({"outgoing_preset": "5 Dk içinde geliyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
@@ -179,7 +226,7 @@ else:
                             supabase.table("notifications").update({"outgoing_preset": "Hemen aracı çekiyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
                             st.rerun()
                         if cols[2].button("🔴 Gecikeceğim", key=f"r3_{n['id']}"):
-                            supabase.table("notifications").update({"outgoing_preset": "15-20 dakika gecikeceğim, kusura bakmayın.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
+                            supabase.table("notifications").update({"outgoing_preset": "15-20 dakika gecikeceğim.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
                             st.rerun()
                         
                         if n.get("outgoing_preset"):
