@@ -136,7 +136,7 @@ else:
                 new_id = res.data[0]["id"]
 
                 # QR Kod URL
-                app_url = f"https://cekcekqr.streamlit.app/?v={new_id}"
+                app_url = https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app/
                 
                 qr = qrcode.make(app_url)
                 buf = BytesIO()
