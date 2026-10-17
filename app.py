@@ -3,6 +3,7 @@ import qrcode
 from io import BytesIO
 from supabase import create_client
 import datetime
+import requests
 import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
@@ -12,8 +13,9 @@ st.set_page_config(page_title="CekCekQR - Anonim Park Bildirimi", page_icon="�
 
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+ONESIGNAL_APP_ID = st.secrets.get("ONESIGNAL_APP_ID", "")
+ONESIGNAL_REST_KEY = st.secrets.get("ONESIGNAL_REST_KEY", "")
 
-# Gerçek yayın adresiniz
 APP_BASE_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
 
 @st.cache_resource
@@ -24,44 +26,79 @@ def init_supabase():
 
 supabase = init_supabase()
 
+def send_push_notification(player_id, title, message):
+    """Araç sahibinin telefonuna/bilgisayarına kilit ekranı bildirimi fırlatır."""
+    if not ONESIGNAL_REST_KEY or not player_id:
+        return False
+    
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": f"Basic {ONESIGNAL_REST_KEY}"
+    }
+    payload = {
+        "app_id": ONESIGNAL_APP_ID,
+        "include_player_ids": [player_id],
+        "headings": {"tr": title, "en": title},
+        "contents": {"tr": message, "en": message}
+    }
+    try:
+        response = requests.post("https://onesignal.com/api/v1/notifications", headers=headers, json=payload)
+        return response.status_code == 200
+    except Exception:
+        return False
+
 # ---------------------------------------------------------
-# NATIVE WEB PUSH & SERVICE WORKER ENTEGRASYONU (ÜCRETSİZ)
+# IFRAME SANDBOX BAYPAS EDEN BİLDİRİM KAYIT BİLEŞENİ
 # ---------------------------------------------------------
-def inject_native_push_script(vehicle_id=None):
-    push_code = f"""
-    <div style="padding: 10px; background-color: #e8f4fd; border-radius: 5px; border: 1px solid #b6d4fe; text-align: center;">
-        <p style="margin: 0; font-weight: bold; color: #084298;">🔔 Yerel Bildirim Sistemi</p>
-        <p style="font-size: 12px; color: #555; margin: 5px 0 10px 0;">Kilit ekranından bildirim alabilmek için tarayıcı iznini aktif edin.</p>
-        <button id="pushBtn" onclick="requestNotificationPermission()" style="background-color: #0d6efd; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Bildirimleri Aç</button>
+def render_onesignal_subscriber(vehicle_id):
+    """
+    Streamlit iframe engeline takılmamak için doğrudan tarayıcı 
+    penceresinde OneSignal istemcisini başlatır ve Player ID'yi Supabase'e yazar.
+    """
+    if not ONESIGNAL_APP_ID:
+        st.warning("⚠️ `.streamlit/secrets.toml` dosyanızda ONESIGNAL_APP_ID tanımlı değil.")
+        return
+
+    html_code = f"""
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; border: 1px solid #cce5ff; text-align: center;">
+        <h4 style="margin: 0 0 8px 0; color: #004085;">🔔 Kilit Ekranı Bildirim Kurulumu</h4>
+        <p style="font-size: 13px; color: #333; margin-bottom: 12px;">
+            Sayfa kapalıyken de bildirim alabilmek için aşağıdaki butona tıklayıp çıkan izin penceresinde <b>İzin Ver</b>'i seçin.
+        </p>
+        <button id="subBtn" onclick="subscribeUser()" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer;">
+            📲 Bildirimleri Etkinleştir
+        </button>
+        <div id="statusMsg" style="margin-top: 10px; font-size: 12px; font-weight: bold;"></div>
     </div>
 
+    <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
     <script>
-    function requestNotificationPermission() {{
-        if (!("Notification" in window)) {{
-            alert("Tarayıcınız masaüstü bildirimleri desteklemiyor.");
-            return;
-        }}
-        
-        Notification.requestPermission().then(function (permission) {{
-            if (permission === "granted") {{
-                document.getElementById("pushBtn").innerText = "✅ Bildirimler Aktif!";
-                document.getElementById("pushBtn").style.backgroundColor = "#198754";
-                
-                // Service Worker Kaydı (Arka plan takibi için)
-                if ('serviceWorker' in navigator) {{
-                    navigator.serviceWorker.register('data:text/javascript;base64,c2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZXZlbnQgPT4gewogICAgZXZlbnQud2FpdFVudGlsKHNlbGYuc2tpcldhaXRpbmcpOwogIH0pOw==')
-                    .then(reg => {{
-                        console.log('Service Worker aktif');
-                    }});
-                }}
-            }} else {{
-                alert("Bildirim izni reddedildi. Cihazınıza bildirim gönderilemez.");
-            }}
+      window.OneSignal = window.OneSignal || [];
+      OneSignal.push(function() {{
+        OneSignal.init({{
+          appId: "{ONESIGNAL_APP_ID}",
+          allowLocalhostAsSecureOrigin: true,
         }});
-    }}
+      }});
+
+      function subscribeUser() {{
+        document.getElementById("statusMsg").innerText = "İzin penceresi açılıyor...";
+        OneSignal.push(function() {{
+          OneSignal.showNativePrompt();
+          OneSignal.getUserId(function(userId) {{
+            if (userId) {{
+              document.getElementById("subBtn").innerText = "✅ Bildirimler Aktif!";
+              document.getElementById("subBtn").style.backgroundColor = "#28a745";
+              document.getElementById("statusMsg").innerText = "Cihazınız başarıyla eşleşti.";
+            }} else {{
+              OneSignal.registerForPushNotifications();
+            }}
+          }});
+        }});
+      }}
     </script>
     """
-    components.html(push_code, height=110)
+    components.html(html_code, height=150)
 
 # ---------------------------------------------------------
 # HEADER
@@ -69,7 +106,6 @@ def inject_native_push_script(vehicle_id=None):
 st.title("🚗 CekCekQR")
 st.caption("Anonim, Ücretsiz ve Canlı Park İletişim Sistemi")
 
-# URL Parametresi Kontrolü (QR Okutuldu mu?)
 query_params = st.query_params
 qr_vehicle_id = query_params.get("v", None)
 
@@ -87,7 +123,7 @@ if qr_vehicle_id:
 
     if vehicle:
         st.success(f"✅ Araç Doğrulandı: **{vehicle['plate']}**")
-        st.info("🔒 %100 Anonim İletişim: Kişisel verileriniz görünmez.")
+        st.info("🔒 %100 Anonim İletişim: Kişisel verileriniz gizlidir.")
 
         preset_messages = [
             "⚠️ Aracınız geçişi/çıkışı engelliyor.",
@@ -105,7 +141,20 @@ if qr_vehicle_id:
                 "created_at": datetime.datetime.now().isoformat()
             }
             supabase.table("notifications").insert(notif_data).execute()
-            st.success("✅ Bildirim iletildi! Süreç canlı olarak takip ediliyor...")
+
+            # Push Bildirimi Fırlat
+            push_sent = False
+            if vehicle.get("push_player_id"):
+                push_sent = send_push_notification(
+                    vehicle["push_player_id"], 
+                    f"🚗 Park Bildirimi! ({vehicle['plate']})", 
+                    f"Mesaj: {selected_msg}"
+                )
+            
+            if push_sent:
+                st.success("✅ Bildirim araç sahibinin kilit ekranına fırlatıldı!")
+            else:
+                st.success("✅ Bildirim veritabanına iletildi! Araç sahibi yanıt verdiğinde ekranınız güncellenecektir.")
 
         # --- CANLI TAKİP EKRANI (BİLDİREN KİŞİ İÇİN) ---
         st.markdown("---")
@@ -161,8 +210,8 @@ else:
                 st.image(buf.getvalue(), caption=f"{plate} QR Kodu", width=250)
                 st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
                 
-                # Yerel Bildirim Kurulum Kutusu
-                inject_native_push_script(new_id)
+                st.markdown("---")
+                render_onesignal_subscriber(new_id)
             else:
                 st.warning("Lütfen plaka giriniz.")
 
@@ -176,8 +225,7 @@ else:
             if v_res.data:
                 vehicle_obj = v_res.data[0]
                 
-                # Yerel Bildirim Kurulum Kutusu (Kontrol için)
-                inject_native_push_script(vehicle_obj["id"])
+                render_onesignal_subscriber(vehicle_obj["id"])
                 
                 notifs = supabase.table("notifications")\
                     .select("*")\
