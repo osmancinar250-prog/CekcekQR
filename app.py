@@ -1,147 +1,199 @@
 import streamlit as st
-import requests
 import qrcode
 from io import BytesIO
+from supabase import create_client, Client
+import datetime
+import requests
 
-# --- SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="CekCekQR - Park & İletişim", page_icon="🚗", layout="centered")
+# ---------------------------------------------------------
+# SETUP & CONFIGURATION
+# ---------------------------------------------------------
+st.set_page_config(page_title="CekCekQR - Anonim Park Bildirimi", page_icon="🚗", layout="centered")
 
-# --- META WHATSAPP AYARLARI ---
-try:
-    WHATSAPP_TOKEN = st.secrets["WHATSAPP_TOKEN"]
-    PHONE_NUMBER_ID = st.secrets["PHONE_NUMBER_ID"]
-except Exception:
-    WHATSAPP_TOKEN = ""
-    PHONE_NUMBER_ID = ""
+# Secrets Control (Streamlit Secrets üzerinden okunur)
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+ONESIGNAL_APP_ID = st.secrets.get("ONESIGNAL_APP_ID", "")
+ONESIGNAL_REST_KEY = st.secrets.get("ONESIGNAL_REST_KEY", "")
 
-BASE_APP_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app" 
+@st.cache_resource
+def init_supabase():
+    if SUPABASE_URL and SUPABASE_KEY:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return None
 
-# Bellekte güvenli veri saklama
-if "vehicles_db" not in st.session_state:
-    st.session_state.vehicles_db = {}
+supabase = init_supabase()
 
-# Test plakasını sabitliyoruz (Kendi test numaranı Meta paneline eklediysen buraya da yazabilirsin)
-st.session_state.vehicles_db["34DFJ037"] = {
-    "owner_name": "Test Sahibi", 
-    "owner_phone": "905551234567"
-}
+# ---------------------------------------------------------
+# HELPER FUNCTIONS
+# ---------------------------------------------------------
+def send_push_notification(player_id, title, message):
+    """Araç sahibinin telefonuna kilit ekranı bildirimi gönderir."""
+    if not ONESIGNAL_REST_KEY or not player_id:
+        return False
+    
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": f"Basic {ONESIGNAL_REST_KEY}"
+    }
+    payload = {
+        "app_id": ONESIGNAL_APP_ID,
+        "include_player_ids": [player_id],
+        "headings": {"tr": title, "en": title},
+        "contents": {"tr": message, "en": message}
+    }
+    try:
+        response = requests.post("https://onesignal.com/api/v1/notifications", headers=headers, json=payload)
+        return response.status_code == 200
+    except Exception:
+        return False
 
-if "logs_db" not in st.session_state:
-    st.session_state.logs_db = []
-
+# ---------------------------------------------------------
+# APP HEADER
+# ---------------------------------------------------------
 st.title("🚗 CekCekQR")
-st.caption("Güvenli ve Takip Edilebilir Araç İletişim Sistemi")
+st.caption("Güvenli, Anonim ve Çift Taraflı Araç Park İletişim Sistemi")
 
-tab1, tab2, tab3 = st.tabs(["📝 Araç Kaydı & QR Üret", "🔔 QR Okut / Mesaj Gönder", "📊 Bildirim Logları (Adli Takip)"])
+# URL Parametresi Kontrolü (QR Okutuldu mu?)
+query_params = st.query_params
+qr_vehicle_id = query_params.get("v", None)
 
 # ---------------------------------------------------------
-# TAB 1: ARAÇ SAHİBİ KAYDI VE QR KOD OLUŞTURMA
+# MOD 1: QR OKUTULDU (BİLDİRİM VE YANIT EKRANI)
 # ---------------------------------------------------------
-with tab1:
-    st.subheader("Araç Kaydı ve QR Kod Üretimi")
-    st.info("Plakanız ve numaranız güvenle saklanır.")
+if qr_vehicle_id:
+    st.subheader("📢 Araç Sahibine Bildirim Gönder")
     
-    with st.form("register_form"):
-        owner_name = st.text_input("Ad Soyad", placeholder="Örn: Osman Çınar")
-        plate = st.text_input("Araç Plakası", placeholder="Örn: 34DFJ037").strip().upper()
-        owner_phone = st.text_input("WhatsApp Numaranız (Ülke koduyla)", placeholder="Örn: 905551234567").strip()
-        submit_reg = st.form_submit_button("Kayıt Oluştur ve QR Üret")
+    # Araç Bilgisini Getir
+    try:
+        res = supabase.table("vehicles").select("*").eq("id", qr_vehicle_id).execute()
+        vehicle = res.data[0] if res.data else None
+    except Exception as e:
+        vehicle = None
+        st.error("Araç bilgisi doğrulanamadı.")
 
-    if submit_reg:
-        if not plate or not owner_phone:
-            st.error("Lütfen plaka ve telefon numaranızı giriniz.")
-        else:
-            clean_plate = plate.replace(" ", "").upper()
-            st.session_state.vehicles_db[clean_plate] = {
-                "owner_name": owner_name,
-                "owner_phone": owner_phone
-            }
-            st.success(f"✅ {clean_plate} plakası sisteme başarıyla kaydedildi!")
+    if vehicle:
+        st.success("✅ Araç Sistemde Doğrulandı")
+        st.info("🔒 Gizlilik İlkesi: İletişim bilgileriniz araç sahibiyle kesinlikle paylaşılmaz, sadece sistem kayıtlarında güvenle saklanır.")
 
-            qr_data = f"{BASE_APP_URL}/?plate={clean_plate}"
-            qr = qrcode.QRCode(version=1, box_size=10, border=4)
-            qr.add_data(qr_data)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            buf = BytesIO()
-            img.save(buf, format="PNG")
-            byte_im = buf.getvalue()
+        # Bildiren Kişi Bilgisi (Sistem kaydı için şart)
+        sender_phone = st.text_input("Telefon Numaranız (Sadece doğrulama ve kayıt içindir, gizli tutulur):", placeholder="05XXXXXXXXX")
 
-            st.image(byte_im, caption=f"{clean_plate} İçin Üretilen QR Kod", width=220)
-            st.download_button("QR Kodu İndir (PNG)", data=byte_im, file_name=f"CekCekQR_{clean_plate}.png", mime="image/png")
+        # Kalıp Mesaj Seçimi
+        preset_messages = [
+            "⚠️ Aracınız geçişi/çıkışı engelliyor.",
+            "💡 Aracınızın farları açık kaldı.",
+            "🪟 Aracınızın camı açık kaldı.",
+            "💥 Aracınıza temas/hasar gerçekleşti."
+        ]
+        selected_msg = st.selectbox("Göndermek İstediğiniz Bildirim:", preset_messages)
 
-# ---------------------------------------------------------
-# TAB 2: QR OKUTAN KİŞİNİN MESAJ GÖNDERMESİ (NUMARA ZORUNLU)
-# ---------------------------------------------------------
-with tab2:
-    st.subheader("Araç Sahibine Bildirim Gönder")
-    st.warning("⚠️ Güvenlik ve kötü kullanımı önlemek amacıyla telefon numaranız araç sahibine iletilecektir.")
-    
-    query_params = st.query_params
-    default_plate = query_params.get("plate", "").strip().upper()
-
-    target_plate = st.text_input("Hedef Plaka", value=default_plate, placeholder="Örn: 34DFJ037").strip().upper()
-    sender_phone = st.text_input("Sizin Telefon Numaranız (Ülke koduyla - Geri dönüş için zorunlu)", placeholder="Örn: 905321234567").strip()
-    
-    message_body = st.selectbox("Bildirim Nedeni", [
-        "Lütfen aracınızı çeker misiniz? Yol kapalı.",
-        "Aracınızın alarmı çalıyor.",
-        "Aracınızın camı açık kalmış."
-    ])
-
-    if st.button("Bildirim Gönder"):
-        if not target_plate or not sender_phone:
-            st.error("Lütfen hedef plaka ve kendi telefon numaranızı giriniz.")
-        else:
-            clean_target = target_plate.replace(" ", "").upper()
-            destination_phone = None
-            
-            if clean_target in st.session_state.vehicles_db:
-                destination_phone = st.session_state.vehicles_db[clean_target]["owner_phone"]
-
-            if not destination_phone:
-                st.error(f"'{clean_target}' plakası sistemde kayıtlı değil!")
+        if st.button("🚨 Bildirimi Gönder"):
+            if not sender_phone or len(sender_phone) < 10:
+                st.warning("Lütfen geçerli bir telefon numarası giriniz.")
             else:
-                url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
-                headers = {
-                    "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-                    "Content-Type": "application/json",
+                # Veritabanına kaydet (Gönderenin numarası gizli kayıt altında kalır)
+                notif_data = {
+                    "vehicle_id": qr_vehicle_id,
+                    "sender_phone": sender_phone,
+                    "incoming_preset": selected_msg,
+                    "status": "BEKLIYOR",
+                    "created_at": datetime.datetime.now().isoformat()
                 }
+                supabase.table("notifications").insert(notif_data).execute()
+
+                # Araç Sahibine Push Bildirimi Fırlat
+                if vehicle.get("push_player_id"):
+                    send_push_notification(
+                        vehicle["push_player_id"], 
+                        "🚗 Araç Park Bildirimi!", 
+                        f"Aracınız için yeni bildirim: {selected_msg}"
+                    )
                 
-                # Araç sahibine gönderilecek mesaj (Gönderenin numarası açıkça eklenir)
-                full_text = f"🚗 *CekCekQR Park Bildirimi*\n\n{clean_target} plakalı aracınız için mesaj:\n\n💬 {message_body}\n\n📞 Bildiren Kişinin Telefonu: {sender_phone}\n\n*(Geri dönüş yapabilir veya iletişime geçebilirsiniz.)*"
+                st.success(" Bildirim araç sahibine iletildi! Yanıt bekleniyor...")
 
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "to": destination_phone,
-                    "type": "text",
-                    "text": {"body": full_text}
+        # Canlı Durum Takibi (Araç Sahibinin Yanıtı)
+        st.markdown("---")
+        st.write("🔄 **Canlı Yanıt Durumu:**")
+        
+        # Son bildirimi kontrol et
+        latest_notif = supabase.table("notifications")\
+            .select("*")\
+            .eq("vehicle_id", qr_vehicle_id)\
+            .order("created_at", desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if latest_notif.data and latest_notif.data[0].get("outgoing_preset"):
+            st.info(f"💬 **Araç Sahibinin Yanıtı:** {latest_notif.data[0]['outgoing_preset']}")
+        else:
+            st.caption("Henüz yanıt verilmedi. Sayfa otomatik güncellenecektir.")
+
+# ---------------------------------------------------------
+# MOD 2: GENEL PANEL (KAYIT & ARAÇ SAHİBİ YÖNETİMİ)
+# ---------------------------------------------------------
+else:
+    tab1, tab2 = st.tabs(["📝 Araç Kaydı & QR Üret", "📲 Bildirim Panellerim"])
+
+    with tab1:
+        st.subheader("Yeni Araç Kaydı")
+        plate = st.text_input("Plakanız:", placeholder="34ABC123").upper()
+        owner_phone = st.text_input("Telefon Numaranız (Gizli Saklanır):", placeholder="05XXXXXXXXX")
+        
+        if st.button("QR Kod Oluştur"):
+            if plate and owner_phone:
+                # Veritabanına Ekle
+                v_data = {
+                    "plate": plate,
+                    "owner_phone": owner_phone
                 }
+                res = supabase.table("vehicles").insert(v_data).execute()
+                new_id = res.data[0]["id"]
 
-                try:
-                    response = requests.post(url, headers=headers, json=payload)
-                    if response.status_code == 200:
-                        st.success("✅ Bildirim ve iletişim numaranız araç sahibine başarıyla iletildi!")
-                        # Loglama (Adli durumlar / takip için)
-                        st.session_state.logs_db.insert(0, {
-                            "Hedef Plaka": clean_target, 
-                            "Bildiren Numara": sender_phone, 
-                            "Mesaj": message_body, 
-                            "Durum": "Başarılı"
-                        })
-                    else:
-                        st.error(f"❌ Meta API Hatası: {response.text}")
-                except Exception as e:
-                    st.error(f"Bağlantı hatası: {e}")
+                # QR Kod Linki
+                app_url = f"https://cekcekqr.streamlit.app/?v={new_id}"
+                
+                qr = qrcode.make(app_url)
+                buf = BytesIO()
+                qr.save(buf)
+                
+                st.success("✅ Aracınız başarıyla kaydedildi!")
+                st.image(buf.getvalue(), caption=f"{plate} için QR Kodunuz", width=250)
+                st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
+            else:
+                st.warning("Lütfen tüm alanları doldurun.")
 
-# ---------------------------------------------------------
-# TAB 3: GEÇMİŞ HAREKETLER (LOGLAR)
-# ---------------------------------------------------------
-with tab3:
-    st.subheader("Bildirim ve Takip Logları")
-    st.info("Kötü niyetli kullanım ve taciz durumlarına karşı tüm bildirimler kayıt altındadır.")
-    if st.session_state.logs_db:
-        st.dataframe(st.session_state.logs_db)
-    else:
-        st.info("Henüz geçmiş kayıt yok.")
+    with tab2:
+        st.subheader("Gelen Bildirimler ve Yanıt Verme")
+        owner_phone_check = st.text_input("Kayıtlı Telefon Numaranızla Giriş Yapın:", type="password")
+        
+        if owner_phone_check:
+            # Araç sahibinin araçlarını bul
+            my_vehicles = supabase.table("vehicles").select("id, plate").eq("owner_phone", owner_phone_check).execute()
+            
+            if my_vehicles.data:
+                v_ids = [v["id"] for v in my_vehicles.data]
+                
+                # Gelen bildirimleri listele
+                notifs = supabase.table("notifications").select("*").in_("vehicle_id", v_ids).order("created_at", desc=True).execute()
+                
+                for n in notifs.data:
+                    st.write(f"📌 **Tarih:** {n['created_at'][:16]} | **Bildirim:** {n['incoming_preset']}")
+                    
+                    # Yanıt Verme Butonları
+                    reply_cols = st.columns(3)
+                    if reply_cols[0].button("🟢 5 Dk'ya Geliyorum", key=f"r1_{n['id']}"):
+                        supabase.table("notifications").update({"outgoing_preset": "5 Dk içinde geliyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
+                        st.rerun()
+                    if reply_cols[1].button("🟡 Aracı Çekiyorum", key=f"r2_{n['id']}"):
+                        supabase.table("notifications").update({"outgoing_preset": "Hemen aracı çekiyorum.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
+                        st.rerun()
+                    if reply_cols[2].button("🔴 Gecikeceğim (15 Dk)", key=f"r3_{n['id']}"):
+                        supabase.table("notifications").update({"outgoing_preset": "Yaklaşık 15 dakika gecikeceğim.", "status": "YANITLANDI"}).eq("id", n["id"]).execute()
+                        st.rerun()
+                    
+                    if n.get("outgoing_preset"):
+                        st.caption(f"Verilen Yanıt: {n['outgoing_preset']}")
+                    st.markdown("---")
+            else:
+                st.error("Bu numaraya ait kayıtlı araç bulunamadı.")
