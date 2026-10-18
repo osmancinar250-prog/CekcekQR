@@ -217,8 +217,8 @@ reply_action = query_params.get("action", None)
 # LOGO VE BAŞLIK ALANI
 # ---------------------------------------------------------
 with col_head:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=180)
+    if os.path.exists("logo.PNG"):
+        st.image("logo.PNG", width=180)
     else:
         st.title(txt["title"])
     st.caption(txt["subtitle"])
