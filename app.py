@@ -5,14 +5,7 @@ from supabase import create_client
 import requests
 import datetime
 import time
-import json
-import threading
-from bot import check_updates
 
-# Arka planda Telegram botunu çalıştıran thread (Sadece 1 kez başlatılır)
-if "bot_running" not in st.session_state:
-    st.session_state.bot_running = True
-    threading.Thread(target=check_updates, daemon=True).start()
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
 # ---------------------------------------------------------
@@ -36,7 +29,7 @@ def init_supabase():
 supabase = init_supabase()
 
 def send_telegram_message(chat_id, text):
-    """Telegram API üzerinden mesaj gönderir."""
+    """Telegram API üzerinden bildirim mesajı gönderir."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -48,67 +41,15 @@ def send_telegram_message(chat_id, text):
         return False
 
 # ---------------------------------------------------------
-# URL PARAMETRELERİ & TELEGRAM WEBHOOK DİNLEYİCİSİ
+# URL PARAMETRELERİ
 # ---------------------------------------------------------
 query_params = st.query_params
 qr_vehicle_id = query_params.get("v", None)
 reply_notif_id = query_params.get("reply", None)
 reply_action = query_params.get("action", None)
-is_webhook = query_params.get("webhook", None)
-
-# TELEGRAM BOTUNDAN GELEN /kayit KOMUTLARINI OTOMATİK YAKALAMA
-if is_webhook:
-    try:
-        # Telegram'dan gelen POST verisini oku
-        raw_body = st.context.request.body.decode("utf-8")
-        data = json.loads(raw_body)
-        
-        message = data.get("message", {})
-        text = message.get("text", "").strip()
-        chat_id = message.get("chat", {}).get("id")
-
-        if text.startswith("/start"):
-            welcome_msg = (
-                "👋 *CekCekQR'a Hoş Geldiniz!*\n\n"
-                "Aracınızı kaydetmek için plaka ve telefon numaranızı şu formatta gönderin:\n\n"
-                "`/kayit 34ABC123 05XXXXXXXXX`"
-            )
-            send_telegram_message(chat_id, welcome_msg)
-
-        elif text.startswith("/kayit"):
-            parts = text.split()
-            if len(parts) >= 3:
-                plate = parts[1].upper().replace(" ", "")
-                phone = parts[2].strip()
-                
-                # Supabase'e Kaydet
-                if supabase:
-                    v_data = {
-                        "plate": plate,
-                        "phone": phone,
-                        "telegram_chat_id": str(chat_id)
-                    }
-                    res = supabase.table("vehicles").insert(v_data).execute()
-                    if res.data:
-                        v_id = res.data[0]["id"]
-                        qr_link = f"{APP_BASE_URL}/?v={v_id}"
-                        send_telegram_message(
-                            chat_id, 
-                            f"✅ *Kayıt Başarılı!*\n\n"
-                            f"🚗 *Plaka:* {plate}\n"
-                            f"📱 *Telefon:* {phone}\n\n"
-                            f"🔗 *QR Kod Bağlantınız:*\n{qr_link}"
-                        )
-                    else:
-                        send_telegram_message(chat_id, "❌ Kayıt yapılırken bir hata oluştu.")
-            else:
-                send_telegram_message(chat_id, "⚠️ *Eksik bilgi!* Lütfen şu formatta yazın:\n`/kayit 34ABC123 05XXXXXXXXX`")
-    except Exception:
-        pass
-    st.stop()
 
 # ---------------------------------------------------------
-# SENARYO C: ARAÇ SAHİBİ YANIT LİNKİNE TIKLADIYSA
+# SENARYO C: ARAÇ SAHİBİ BİLDİRİM LİNKİNE TIKLADIYSA (YANIT ONAYI)
 # ---------------------------------------------------------
 if reply_notif_id and reply_action:
     st.title("🚗 CekCekQR - Yanıt Onayı")
@@ -119,7 +60,7 @@ if reply_notif_id and reply_action:
                 st.warning(f"⚠️ Yanıtınız iletildi: **{reply_action}**")
             else:
                 st.success(f"✅ Yanıtınız başarıyla kaydedildi: **{reply_action}**")
-            st.info("Bu pencereyi kapatabilirsiniz. Vatandaş bilgilendirildi.")
+            st.info("Bu pencereyi kapatabilirsiniz. Bildirimi yapan kişi anlık olarak bilgilendirildi.")
         except Exception as e:
             st.error(f"Güncelleme hatası: {e}")
     st.stop()
@@ -131,7 +72,7 @@ st.title("🚗 CekCekQR")
 st.caption("Çift Yönlü Anlık Park İletişim Sistemi")
 
 # ---------------------------------------------------------
-# SENARYO A: QR KOD OKUTULDU (Bildiren Kişi + Canlı Takip)
+# SENARYO A: QR KOD OKUTULDU (Bildiren Kişi + Canlı Takip Ekranı)
 # ---------------------------------------------------------
 if qr_vehicle_id:
     st.subheader("📢 Araç Sahibine Bildirim Gönder")
@@ -202,7 +143,7 @@ if qr_vehicle_id:
         
         else:
             # CANLI TAKİP EKRANI
-            st.info("📡 Bildirim araç sahibine iletildi. Yanıtı bekleniyor...")
+            st.info("📡 Bildirim araç sahibine iletildi. Anlık yanıtı bekleniyor...")
             status_placeholder = st.empty()
             
             for _ in range(60):
@@ -234,8 +175,18 @@ if qr_vehicle_id:
         st.error("Geçersiz veya veritabanında bulunmayan QR Kod.")
 
 # ---------------------------------------------------------
-# SENARYO B: MANUEL KAYIT (YEDEK)
+# SENARYO B: WEB ÜZERİNDEN KULLANICI / ARAÇ KAYDI (SABİT & KARARLI SİSTEM)
 # ---------------------------------------------------------
 else:
-    st.subheader("📲 Kolay Kayıt Yöntemi (Telegram)")
-    st.info("Sayısal ID kopyalamanıza gerek kalmadan kayıt olmak için Telegram botumuza gidin:\n\n**@cekcekqr_bot** hesabına şu mesajı atın:\n`/kayit 34ABC123 05XXXXXXXXX`")
+    st.subheader("📝 Araç Kaydı Oluştur")
+    st.write("Aracınızı sisteme ekleyerek QR kodunuzu oluşturun.")
+
+    with st.form("vehicle_registration_form"):
+        plate_input = st.text_input("Plaka:", placeholder="Örn: 34ABC123")
+        phone_input = st.text_input("Telefon Numarası:", placeholder="Örn: 05XXXXXXXXX")
+        chat_id_input = st.text_input("Telegram Chat ID:", placeholder="Örn: 123456789 (Botumuzdan alabilirsiniz)")
+        
+        submit_btn = st.form_submit_button("🚀 Kaydol ve QR Kod Üret")
+
+    if submit_btn:
+        if
