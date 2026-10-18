@@ -10,9 +10,9 @@ import os
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
 # ---------------------------------------------------------
-st.set_page_config(page_title="CekCekQR - Global Park Iletisimi", page_icon="🚗", layout="centered")
+st.set_page_config(page_title="CekCekQR - Global Park İletişimi", page_icon="🚗", layout="centered")
 
-# Modern Premium SaaS CSS Tasarimi
+# Modern Premium SaaS CSS Tasarımı (Mobil Uyumlu & Ortalı Logo)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -27,11 +27,22 @@ st.markdown("""
     }
 
     .main .block-container {
-        padding-top: 2rem;
+        padding-top: 1.5rem;
         padding-bottom: 3rem;
         max-width: 580px;
     }
 
+    /* Logoyu ve Dil Seçiciyi Ortala */
+    .centered-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Form Kart Yapısı */
     div[data-testid="stForm"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
@@ -40,13 +51,22 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
     }
 
+    /* Form Etiketlerini (Label) Belirgin ve Okunabilir Yapma */
+    div[data-testid="stForm"] label p {
+        color: #1E293B !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+    }
+
+    /* Input Alanları */
     .stTextInput input {
         border-radius: 10px !important;
-        border: 1.5px solid #E2E8F0 !important;
+        border: 1.5px solid #CBD5E1 !important;
         padding: 12px 14px !important;
         font-size: 0.95rem !important;
         transition: all 0.2s ease-in-out !important;
         background-color: #FAFAFC !important;
+        color: #0F172A !important;
     }
     .stTextInput input:focus {
         border-color: #0066FF !important;
@@ -54,6 +74,7 @@ st.markdown("""
         box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.12) !important;
     }
 
+    /* Butonlar - Taşmayı Önleyen Tam Genişlik */
     .stButton>button, div[data-testid="stForm"] button {
         background: linear-gradient(135deg, #0066FF 0%, #0047FF 100%) !important;
         color: #FFFFFF !important;
@@ -65,6 +86,7 @@ st.markdown("""
         box-shadow: 0 4px 14px rgba(0, 102, 255, 0.3) !important;
         transition: all 0.2s ease !important;
         width: 100% !important;
+        margin-top: 0.5rem !important;
     }
     .stButton>button:hover, div[data-testid="stForm"] button:hover {
         transform: translateY(-1px) !important;
@@ -115,45 +137,45 @@ def init_supabase():
 supabase = init_supabase()
 
 # ---------------------------------------------------------
-# COK DILLI (LOCALIZATION) SOZLUK
+# ÇOK DİLLİ (LOCALIZATION) SÖZLÜK
 # ---------------------------------------------------------
 I18N = {
     "TR": {
         "title": "CekCekQR",
-        "subtitle": "Cift Yonlu Anlik Park Iletisim Sistemi",
-        "reg_header": "Arac Kaydi Olustur",
-        "reg_sub": "Aracinizi sisteme ekleyerek QR kodunuzu hemen olusturun.",
+        "subtitle": "Çift Yönlü Anlık Park İletişim Sistemi",
+        "reg_header": "Araç Kaydı Oluştur",
+        "reg_sub": "Aracınızı sisteme ekleyerek QR kodunuzu hemen oluşturun.",
         "plate_label": "Plaka",
-        "plate_holder": "Orn: 34ABC123",
-        "phone_label": "Telefon Numarasi",
-        "phone_holder": "Orn: +905XXXXXXXXX",
+        "plate_holder": "Örn: 34ABC123",
+        "phone_label": "Telefon Numarası",
+        "phone_holder": "Örn: +905XXXXXXXXX",
         "chat_id_label": "Telegram Chat ID",
-        "chat_id_holder": "Orn: 123456789",
-        "submit_btn": "Kaydol ve QR Kod Uret",
-        "chat_id_info": "Telegram Chat ID'nizi nasil ogrenirsiniz?<br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza mesaj atarak Chat ID'nizi aninda ogrenebilirsiniz.",
-        "notify_header": "Arac Sahibine Bildirim Gonder",
-        "verified": "Arac Dogrulandi:",
-        "sender_phone": "Telefon Numarasi (Yasal dogrulama icin):",
+        "chat_id_holder": "Örn: 123456789",
+        "submit_btn": "Kaydol ve QR Kod Üret",
+        "chat_id_info": "Telegram Chat ID'nizi nasıl öğrenirsiniz?<br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza mesaj atarak Chat ID'nizi anında öğrenebilirsiniz.",
+        "notify_header": "Araç Sahibine Bildirim Gönder",
+        "verified": "Araç Doğrulandı:",
+        "sender_phone": "Telefon Numaranız (Yasal doğrulama için):",
         "presets": [
-            "Araciniz gecisi/cikisi engelliyor.",
-            "Aracinizin farlari acik kaldi.",
-            "Aracinizin cami acik kaldi.",
-            "Araciniza temas/hasar gerceklesti."
+            "Aracınız geçişi/çıkışı engelliyor.",
+            "Aracınızın farları açık kaldı.",
+            "Aracınızın camı açık kaldı.",
+            "Aracınıza temas/hasar gerçekleşti."
         ],
-        "send_btn": "Bildirimi Gonder",
-        "waiting": "Talep gonderildi. Yanit gelene kadar lutfen sayfayi acik tutunuz.",
-        "done": "Surucu yanit verdi, sayfayi kapatabilirsiniz.",
+        "send_btn": "Bildirimi Gönder",
+        "waiting": "Talep gönderildi. Yanıt gelene kadar lütfen sayfayı açık tutunuz.",
+        "done": "Sürücü yanıt verdi, sayfayı kapatabilirsiniz.",
         "btn_coming": "Geliyorum (2 dk)",
-        "btn_moving": "Araci Cekiyorum",
-        "btn_busy": "Gelemiyorum / Musait Degilim",
-        "tg_title": "CekCekQR BILDIRIMI!",
+        "btn_moving": "Aracı Çekiyorum",
+        "btn_busy": "Gelemiyorum / Müsait Değilim",
+        "tg_title": "CekCekQR BİLDİRİMİ!",
         "tg_plate": "Plaka:",
         "tg_msg": "Mesaj:",
-        "tg_prompt": "Durumunuzu bildirmek icin butona tiklayin:",
-        "reply_title": "CekCekQR - Yanit Onayi",
-        "reply_success": "Yanitiniz kaydedildi:",
+        "tg_prompt": "Durumunuzu bildirmek için butona tıklayın:",
+        "reply_title": "CekCekQR - Yanıt Onayı",
+        "reply_success": "Yanıtınız kaydedildi:",
         "reply_close": "Bu pencereyi kapatabilirsiniz.",
-        "invalid_qr": "Gecersiz veya veritabaninda bulunmayan QR Kod."
+        "invalid_qr": "Geçersiz veya veritabanında bulunmayan QR Kod."
     },
     "EN": {
         "title": "CekCekQR",
@@ -231,15 +253,24 @@ I18N = {
     }
 }
 
-# Dil Secici (Header Top-Right)
-col_head, col_lang = st.columns([3, 1])
-with col_lang:
-    selected_lang = st.selectbox("Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
+# Dil Seçici (Üst Kısımda Şık ve Ortalanmış)
+col_center = st.container()
+with col_center:
+    st.markdown("<div class='centered-container'>", unsafe_allow_html=True)
+    if os.path.exists("logo.PNG"):
+        st.image("logo.PNG", width=180)
+    elif os.path.exists("logo.png"):
+        st.image("logo.png", width=180)
+    else:
+        st.title(txt["title"])
+    st.caption(txt["subtitle"])
+    
+    selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 txt = I18N[selected_lang]
 
 def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
-    """Secilen dilde Telegram Inline Butonlari gonderir."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
     
@@ -266,26 +297,12 @@ def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
         return False
 
 # ---------------------------------------------------------
-# URL PARAMETRELERI
+# URL PARAMETRELERİ
 # ---------------------------------------------------------
 query_params = st.query_params
 qr_vehicle_id = query_params.get("v", None)
 reply_notif_id = query_params.get("reply", None)
 reply_action = query_params.get("action", None)
-
-# ---------------------------------------------------------
-# LOGO VE BASLIK ALANI
-# ---------------------------------------------------------
-with col_head:
-    if os.path.exists("logo.PNG"):
-        st.image("logo.PNG", width=200)
-    elif os.path.exists("logo.png"):
-        st.image("logo.png", width=200)
-    else:
-        st.title(txt["title"])
-    st.caption(txt["subtitle"])
-
-st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # SENARYO C: YANIT ONAYI
@@ -358,7 +375,6 @@ if qr_vehicle_id:
                     st.warning("Please enter phone number.")
         
         else:
-            # CANLI TAKIP EKRANI
             st.markdown(f"<div class='info-card'>{txt['waiting']}</div>", unsafe_allow_html=True)
             status_placeholder = st.empty()
             
