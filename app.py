@@ -12,7 +12,7 @@ import os
 # ---------------------------------------------------------
 st.set_page_config(page_title="CekCekQR - Global Park İletişimi", page_icon="🚗", layout="centered")
 
-# Modern Premium SaaS CSS Tasarımı
+# Modern Premium SaaS CSS Tasarımı (Optimize Edilmiş Boşluklar)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -27,38 +27,41 @@ st.markdown("""
     }
 
     .main .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1rem;
         padding-bottom: 3rem;
         max-width: 580px;
     }
 
-    .centered-container {
+    /* Üst Alan / Logo ve Dil Seçici Konteyneri */
+    .header-container {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
     }
 
+    /* Form Kart Yapısı */
     div[data-testid="stForm"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
         border-radius: 16px !important;
-        padding: 2rem !important;
+        padding: 1.5rem !important;
         box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
     }
 
     div[data-testid="stForm"] label p {
         color: #1E293B !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
     }
 
+    /* Input Alanları */
     .stTextInput input {
         border-radius: 10px !important;
         border: 1.5px solid #CBD5E1 !important;
-        padding: 12px 14px !important;
+        padding: 10px 14px !important;
         font-size: 0.95rem !important;
         transition: all 0.2s ease-in-out !important;
         background-color: #FAFAFC !important;
@@ -70,6 +73,7 @@ st.markdown("""
         box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.12) !important;
     }
 
+    /* Butonlar - Tam Genişlik ve Dengeli Duruş */
     .stButton>button, div[data-testid="stForm"] button {
         background: linear-gradient(135deg, #0066FF 0%, #0047FF 100%) !important;
         color: #FFFFFF !important;
@@ -99,7 +103,7 @@ st.markdown("""
         border-left: 4px solid #0066FF;
         border-radius: 12px;
         padding: 1.2rem;
-        margin-top: 1.5rem;
+        margin-top: 1rem;
         color: #1E40AF;
         font-size: 0.9rem;
         line-height: 1.5;
@@ -159,7 +163,7 @@ I18N = {
         ],
         "send_btn": "Bildirimi Gönder",
         "waiting": "Talep gönderildi. Yanıt gelene kadar lütfen sayfayı açık tutunuz.",
-        "done": "Sürücü yanıt verdi, sayfayı kapatabilirsiniz.",
+        "done": "Sürücü yanıt verdi, sayfayi kapatabilirsiniz.",
         "btn_coming": "Geliyorum (2 dk)",
         "btn_moving": "Aracı Çekiyorum",
         "btn_busy": "Gelemiyorum / Müsait Değilim",
@@ -248,26 +252,19 @@ I18N = {
     }
 }
 
-# Dil Seçici (En başta tanımlandı)
-col_center = st.container()
-with col_center:
-    st.markdown("<div class='centered-container'>", unsafe_allow_html=True)
-    selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
-
+# Dil Seçici ve Logo Entegre Alanı (Kompakt ve Ortalı)
+selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
 txt = I18N[selected_lang]
 
-# Logo ve Başlık Ortalanmış Alan
-with col_center:
-    st.markdown("<div class='centered-container'>", unsafe_allow_html=True)
-    if os.path.exists("logo.PNG"):
-        st.image("logo.PNG", width=180)
-    elif os.path.exists("logo.png"):
-        st.image("logo.png", width=180)
-    else:
-        st.title(txt["title"])
-    st.caption(txt["subtitle"])
-    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("<div class='header-container'>", unsafe_allow_html=True)
+if os.path.exists("logo.PNG"):
+    st.image("logo.PNG", width=160)
+elif os.path.exists("logo.png"):
+    st.image("logo.png", width=160)
+else:
+    st.title(txt["title"])
+st.caption(txt["subtitle"])
+st.markdown("</div>", unsafe_allow_html=True)
 
 def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
     if not TELEGRAM_BOT_TOKEN or not chat_id:
@@ -409,14 +406,14 @@ if qr_vehicle_id:
 else:
     st.subheader(txt["reg_header"])
     st.caption(txt["reg_sub"])
-    st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
 
     with st.form("vehicle_registration_form"):
         plate_input = st.text_input(txt["plate_label"], placeholder=txt["plate_holder"])
         phone_input = st.text_input(txt["phone_label"], placeholder=txt["phone_holder"])
         chat_id_input = st.text_input(txt["chat_id_label"], placeholder=txt["chat_id_holder"])
         
-        st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
         submit_btn = st.form_submit_button(txt["submit_btn"])
 
     if submit_btn:
