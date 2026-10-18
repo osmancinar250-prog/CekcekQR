@@ -6,7 +6,13 @@ import requests
 import datetime
 import time
 import json
+import threading
+from bot import check_updates
 
+# Arka planda Telegram botunu çalıştıran thread (Sadece 1 kez başlatılır)
+if "bot_running" not in st.session_state:
+    st.session_state.bot_running = True
+    threading.Thread(target=check_updates, daemon=True).start()
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
 # ---------------------------------------------------------
