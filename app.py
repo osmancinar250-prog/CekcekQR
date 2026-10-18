@@ -21,7 +21,7 @@ def get_image_base64(file_path):
 
 logo_src = get_image_base64("logo.PNG") or get_image_base64("logo.png")
 
-# Agresif Boşluk Daraltma ve Logo Boyutlandırma CSS
+# CSS Stilleri
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -39,7 +39,6 @@ header[data-testid="stHeader"] {
     display: none !important;
 }
 
-/* Sayfa üstündeki TÜM boşlukları sıfırla ve yukarı çek */
 .main .block-container {
     padding-top: 0rem !important;
     padding-bottom: 1.5rem !important;
@@ -49,13 +48,11 @@ header[data-testid="stHeader"] {
     max-width: 460px !important;
 }
 
-/* Streamlit dikey blok boşluklarını tamamen sıfırla */
 div[data-testid="stVerticalBlock"] > div {
     margin-bottom: 0rem !important;
     padding-bottom: 0rem !important;
 }
 
-/* Dil seçici kutusunu küçült ve yukarı çek */
 div[data-testid="stSelectbox"] {
     max-width: 110px !important;
     margin: 0 auto 0.2rem auto !important;
@@ -66,7 +63,6 @@ div[data-testid="stSelectbox"] > div > div {
     font-size: 0.85rem !important;
 }
 
-/* Logoyu KÜÇÜK ve tam ortalanmış tut */
 .brand-container {
     display: flex;
     flex-direction: column;
@@ -79,7 +75,7 @@ div[data-testid="stSelectbox"] > div > div {
 }
 
 .brand-logo-img {
-    max-width: 110px !important; /* Logo boyutunu kibarlaştırdık */
+    max-width: 110px !important;
     width: 110px !important;
     height: auto !important;
     display: block !important;
@@ -95,7 +91,6 @@ div[data-testid="stSelectbox"] > div > div {
     text-align: center;
 }
 
-/* Form Başlık Alanını Logoya Yaklaştır */
 .form-title {
     font-size: 1.15rem !important;
     font-weight: 700 !important;
@@ -112,7 +107,6 @@ div[data-testid="stSelectbox"] > div > div {
     margin-bottom: 0.4rem !important;
 }
 
-/* Form Kart Yapısı */
 div[data-testid="stForm"] {
     background-color: #FFFFFF !important;
     border: 1px solid #E2E8F0 !important;
@@ -148,7 +142,6 @@ div[data-testid="stForm"] label p {
     box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12) !important;
 }
 
-/* Butonlar */
 .stButton>button, div[data-testid="stForm"] button {
     background: linear-gradient(135deg, #0066FF 0%, #0047FF 100%) !important;
     color: #FFFFFF !important;
@@ -197,9 +190,6 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# ---------------------------------------------------------
-# ÇOK DİLLİ SÖZLÜK
-# ---------------------------------------------------------
 I18N = {
     "TR": {
         "title": "CekCekQR",
@@ -212,7 +202,7 @@ I18N = {
         "phone_holder": "Örn: +905XXXXXXXXX",
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "Örn: 123456789",
-        "submit_btn": "Kaydol ve QR Kod Üret",
+        "submit_btn": "Kaydol و QR Kod Üret",
         "chat_id_info": "Telegram Chat ID'nizi nasıl öğrenirsiniz?<br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza mesaj atarak Chat ID'nizi anında öğrenebilirsiniz.",
         "notify_header": "Araç Sahibine Bildirim Gönder",
         "verified": "Araç Doğrulandı:",
@@ -318,6 +308,180 @@ selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label
 txt = I18N[selected_lang]
 
 if logo_src:
-    st.markdown(f"""
-        <div class="brand-container">
-            <img src="{logo_
+    st.markdown(f'<div class="brand-container"><img src="{logo_src}" class="brand-logo-img" alt="Logo" /><div class="brand-subtitle">{txt["subtitle"]}</div></div>', unsafe_allow_html=True)
+else:
+    st.markdown(f'<div class="brand-container"><h2 style="margin:0; color:#0A192F;">{txt["title"]}</h2><div class="brand-subtitle">{txt["subtitle"]}</div></div>', unsafe_allow_html=True)
+
+def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
+        return False
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+        "reply_markup": {
+            "inline_keyboard": [
+                [{"text": lang_dict["btn_coming"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_coming']}"}],
+                [{"text": lang_dict["btn_moving"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_moving']}"}],
+                [{"text": lang_dict["btn_busy"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_busy']}"}]
+            ]
+        }
+    }
+    
+    try:
+        res = requests.post(url, json=payload, timeout=5)
+        return res.status_code == 200
+    except Exception:
+        return False
+
+query_params = st.query_params
+qr_vehicle_id = query_params.get("v", None)
+reply_notif_id = query_params.get("reply", None)
+reply_action = query_params.get("action", None)
+
+if reply_notif_id and reply_action:
+    st.title(txt["reply_title"])
+    if supabase:
+        try:
+            supabase.table("notifications").update({"status": reply_action}).eq("id", reply_notif_id).execute()
+            st.success(f"{txt['reply_success']} **{reply_action}**")
+            st.info(txt["reply_close"])
+        except Exception as e:
+            st.error(f"Error: {e}")
+    st.stop()
+
+if qr_vehicle_id:
+    st.markdown(f"<div class='form-title'>{txt['notify_header']}</div>", unsafe_allow_html=True)
+    
+    vehicle = None
+    if supabase:
+        try:
+            res = supabase.table("vehicles").select("*").eq("id", qr_vehicle_id).execute()
+            vehicle = res.data[0] if res.data else None
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    if vehicle:
+        st.success(f"{txt['verified']} **{vehicle['plate']}**")
+        
+        if "active_notif_id" not in st.session_state:
+            st.session_state.active_notif_id = None
+
+        if not st.session_state.active_notif_id:
+            sender_phone = st.text_input(txt["sender_phone"], placeholder="+...")
+            selected_msg = st.radio("Status:", txt["presets"])
+
+            if st.button(txt["send_btn"]):
+                if sender_phone.strip():
+                    try:
+                        notif_data = {
+                            "vehicle_id": qr_vehicle_id,
+                            "incoming_preset": selected_msg,
+                            "sender_phone": sender_phone.strip(),
+                            "status": "BEKLIYOR",
+                            "created_at": datetime.datetime.now().isoformat()
+                        }
+                        insert_res = supabase.table("notifications").insert(notif_data).execute()
+                        
+                        if insert_res.data:
+                            new_notif_id = insert_res.data[0]["id"]
+                            st.session_state.active_notif_id = new_notif_id
+                            
+                            telegram_chat_id = vehicle.get("telegram_chat_id")
+                            if telegram_chat_id:
+                                msg_text = (
+                                    f"*{txt['tg_title']}*\n\n"
+                                    f"*{txt['tg_plate']}* {vehicle['plate']}\n"
+                                    f"*{txt['tg_msg']}* {selected_msg}\n\n"
+                                    f"_{txt['tg_prompt']}_"
+                                )
+                                send_telegram_inline_keyboard(telegram_chat_id, msg_text, new_notif_id, txt)
+                            
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                else:
+                    st.warning("Please enter phone number.")
+        
+        else:
+            st.markdown(f"<div class='info-card'>{txt['waiting']}</div>", unsafe_allow_html=True)
+            status_placeholder = st.empty()
+            
+            for _ in range(60):
+                try:
+                    check_res = supabase.table("notifications").select("status").eq("id", st.session_state.active_notif_id).execute()
+                    if check_res.data:
+                        current_status = check_res.data[0]["status"]
+                        if current_status != "BEKLIYOR":
+                            status_placeholder.success(f"**{current_status}**")
+                            st.markdown(f"<div class='info-card'>{txt['done']}</div>", unsafe_allow_html=True)
+                                
+                            if st.button("OK"):
+                                st.session_state.active_notif_id = None
+                                st.rerun()
+                            st.stop()
+                except Exception:
+                    pass
+                
+                time.sleep(3)
+            
+            st.warning("Response timeout.")
+            if st.button("Retry"):
+                st.session_state.active_notif_id = None
+                st.rerun()
+
+    else:
+        st.error(txt["invalid_qr"])
+else:
+    st.markdown(f"<div class='form-title'>{txt['reg_header']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='form-subtitle'>{txt['reg_sub']}</div>", unsafe_allow_html=True)
+
+    with st.form("vehicle_registration_form"):
+        plate_input = st.text_input(txt["plate_label"], placeholder=txt["plate_holder"])
+        phone_input = st.text_input(txt["phone_label"], placeholder=txt["phone_holder"])
+        chat_id_input = st.text_input(txt["chat_id_label"], placeholder=txt["chat_id_holder"])
+        
+        submit_btn = st.form_submit_button(txt["submit_btn"])
+
+    if submit_btn:
+        if plate_input and phone_input and chat_id_input:
+            clean_plate = plate_input.upper().replace(" ", "")
+            try:
+                v_data = {
+                    "plate": clean_plate,
+                    "phone": phone_input.strip(),
+                    "telegram_chat_id": chat_id_input.strip()
+                }
+                res = supabase.table("vehicles").insert(v_data).execute()
+                if res.data:
+                    new_id = res.data[0]["id"]
+                    st.success("Success!")
+                    
+                    qr_link = f"{APP_BASE_URL}/?v={new_id}"
+                    
+                    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                    qr.add_data(qr_link)
+                    qr.make(fit=True)
+                    img = qr.make_image(fill_color="black", back_color="white")
+                    
+                    buf = BytesIO()
+                    img.save(buf, format="PNG")
+                    byte_im = buf.getvalue()
+
+                    st.image(byte_im, caption=f"QR: {clean_plate}")
+                    st.download_button(
+                        label="Download QR",
+                        data=byte_im,
+                        file_name=f"CekCekQR_{clean_plate}.png",
+                        mime="image/png"
+                    )
+            except Exception as e:
+                st.error(f"Error: {e}")
+        else:
+            st.warning("Please fill all fields.")
+
+    st.markdown(f"<div class='info-card'>{txt['chat_id_info']}</div>", unsafe_allow_html=True)
