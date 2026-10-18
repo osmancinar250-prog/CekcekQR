@@ -189,4 +189,44 @@ else:
         submit_btn = st.form_submit_button("🚀 Kaydol ve QR Kod Üret")
 
     if submit_btn:
-        if
+        if plate_input and phone_input and chat_id_input:
+            clean_plate = plate_input.upper().replace(" ", "")
+            try:
+                v_data = {
+                    "plate": clean_plate,
+                    "phone": phone_input.strip(),
+                    "telegram_chat_id": chat_id_input.strip()
+                }
+                res = supabase.table("vehicles").insert(v_data).execute()
+                if res.data:
+                    new_id = res.data[0]["id"]
+                    st.success("✅ Kayıt başarılı!")
+                    
+                    qr_link = f"{APP_BASE_URL}/?v={new_id}"
+                    
+                    # QR Kod Görseli Oluşturma
+                    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                    qr.add_data(qr_link)
+                    qr.make(fit=True)
+                    img = qr.make_image(fill_color="black", back_color="white")
+                    
+                    buf = BytesIO()
+                    img.save(buf, format="PNG")
+                    byte_im = buf.getvalue()
+
+                    st.image(byte_im, caption=f"Plaka: {clean_plate} QR Kodu")
+                    st.download_button(
+                        label="📥 QR Kodu İndir",
+                        data=byte_im,
+                        file_name=f"CekCekQR_{clean_plate}.png",
+                        mime="image/png"
+                    )
+                else:
+                    st.error("Kayıt sırasında bir hata oluştu.")
+            except Exception as e:
+                st.error(f"Veritabanı hatası: {e}")
+        else:
+            st.warning("Lütfen tüm alanları doldurunuz.")
+
+    st.markdown("---")
+    st.info("💡 **Telegram Chat ID'nizi nasıl öğrenirsiniz?**\n\nTelegram'dan **@cekcekqr_bot** botumuza herhangi bir mesaj atın, Chat ID'nizi otomatik yanıt olarak alabilirsiniz.")
