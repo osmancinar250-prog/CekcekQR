@@ -5,6 +5,7 @@ from supabase import create_client
 import requests
 import datetime
 import time
+import os
 
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
@@ -25,6 +26,13 @@ st.markdown("""
         border-radius: 12px;
         padding: 1.5rem;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .logo-img {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 220px;
+        margin-bottom: 1rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -51,7 +59,7 @@ supabase = init_supabase()
 # ---------------------------------------------------------
 I18N = {
     "TR": {
-        "title": "🚗 CekCekQR",
+        "title": "CekCekQR",
         "subtitle": "Çift Yönlü Anlık Park İletişim Sistemi",
         "reg_header": "📝 Araç Kaydı Oluştur",
         "reg_sub": "Aracınızı sisteme ekleyerek QR kodunuzu oluşturun.",
@@ -82,13 +90,13 @@ I18N = {
         "tg_plate": "🚗 *Plaka:*",
         "tg_msg": "💬 *Mesaj:*",
         "tg_prompt": "👇 *Durumunuzu bildirmek için butona tıklayın:*",
-        "reply_title": "🚗 CekCekQR - Yanıt Onayı",
+        "reply_title": "CekCekQR - Yanıt Onayı",
         "reply_success": "✅ Yanıtınız kaydedildi:",
         "reply_close": "Bu pencereyi kapatabilirsiniz.",
         "invalid_qr": "Geçersiz veya veritabanında bulunmayan QR Kod."
     },
     "EN": {
-        "title": "🚗 CekCekQR",
+        "title": "CekCekQR",
         "subtitle": "Two-Way Instant Parking Communication System",
         "reg_header": "📝 Vehicle Registration",
         "reg_sub": "Add your vehicle to the system and generate your QR code.",
@@ -119,13 +127,13 @@ I18N = {
         "tg_plate": "🚗 *Plate:*",
         "tg_msg": "💬 *Message:*",
         "tg_prompt": "👇 *Click a button below to update status:*",
-        "reply_title": "🚗 CekCekQR - Response Confirmation",
+        "reply_title": "CekCekQR - Response Confirmation",
         "reply_success": "✅ Your response has been recorded:",
         "reply_close": "You can close this window.",
         "invalid_qr": "Invalid or missing QR Code."
     },
     "RU": {
-        "title": "🚗 CekCekQR",
+        "title": "CekCekQR",
         "subtitle": "Двусторонняя система парковочной связи",
         "reg_header": "📝 Регистрация автомобиля",
         "reg_sub": "Добавьте ваш автомобиль и сгенерируйте QR-код.",
@@ -156,7 +164,7 @@ I18N = {
         "tg_plate": "🚗 *Номер:*",
         "tg_msg": "💬 *Сообщение:*",
         "tg_prompt": "👇 *Нажмите кнопку ниже для ответа:*",
-        "reply_title": "🚗 CekCekQR - Подтверждение ответа",
+        "reply_title": "CekCekQR - Подтверждение ответа",
         "reply_success": "✅ Ваш ответ записан:",
         "reply_close": "Вы можете закрыть это окно.",
         "invalid_qr": "Недействительный QR-код."
@@ -206,6 +214,16 @@ reply_notif_id = query_params.get("reply", None)
 reply_action = query_params.get("action", None)
 
 # ---------------------------------------------------------
+# LOGO VE BAŞLIK ALANI
+# ---------------------------------------------------------
+with col_head:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=180)
+    else:
+        st.title(txt["title"])
+    st.caption(txt["subtitle"])
+
+# ---------------------------------------------------------
 # SENARYO C: YANIT ONAYI
 # ---------------------------------------------------------
 if reply_notif_id and reply_action:
@@ -218,13 +236,6 @@ if reply_notif_id and reply_action:
         except Exception as e:
             st.error(f"Error: {e}")
     st.stop()
-
-# ---------------------------------------------------------
-# ARAYÜZ BAŞLIĞI
-# ---------------------------------------------------------
-with col_head:
-    st.title(txt["title"])
-    st.caption(txt["subtitle"])
 
 # ---------------------------------------------------------
 # SENARYO A: QR KOD OKUTULDU
