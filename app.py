@@ -143,7 +143,7 @@ if qr_vehicle_id:
         
         else:
             # CANLI TAKİP EKRANI
-            st.info("📡 Bildirim araç sahibine iletildi. Anlık yanıtı bekleniyor...")
+            st.info("📡 **Talep gönderildi. Yanıt gelene kadar lütfen sayfayı açık tutunuz.**")
             status_placeholder = st.empty()
             
             for _ in range(60):
@@ -156,6 +156,8 @@ if qr_vehicle_id:
                                 status_placeholder.error(f"❌ **Araç Sahibinin Yanıtı:** {current_status}")
                             else:
                                 status_placeholder.success(f"✅ **Araç Sahibinin Yanıtı:** {current_status}")
+                            
+                            st.info("💡 **Sürücü yanıt verdi, sayfayı kapatabilirsiniz.**")
                                 
                             if st.button("Yeni Bildirim Gönder / Başa Dön"):
                                 st.session_state.active_notif_id = None
@@ -229,4 +231,4 @@ else:
             st.warning("Lütfen tüm alanları doldurunuz.")
 
     st.markdown("---")
-    st.info("💡 **Telegram Chat ID'nizi nasıl öğrenirsiniz?**\n\nTelegram'dan **@cekcekqr_bot** botumuza herhangi bir mesaj atın, Chat ID'nizi otomatik yanıt olarak alabilirsiniz.")
+    st.info("💡 **Telegram Chat ID'nizi nasıl öğrenirsiniz?**\n\nTelegram'dan **@cekcekqr_bot** botumuza herhangi bir mesaj atın, Chat ID'nizi otomatik yanıt alabilirsiniz.")
