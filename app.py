@@ -12,7 +12,7 @@ import os
 # ---------------------------------------------------------
 st.set_page_config(page_title="CekCekQR - Global Park İletişimi", page_icon="🚗", layout="centered")
 
-# Modern Premium SaaS CSS Tasarımı (Optimize Edilmiş Boşluklar)
+# Modern Premium SaaS CSS Tasarımı (Sıfırlandı & Kompakt)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -26,20 +26,27 @@ st.markdown("""
         background-color: #F8FAFC;
     }
 
+    /* Sayfanın en üstündeki gereksiz boşluğu sıfırla */
     .main .block-container {
-        padding-top: 1rem;
-        padding-bottom: 3rem;
+        padding-top: 0.4rem !important;
+        padding-bottom: 2rem !important;
         max-width: 580px;
     }
 
-    /* Üst Alan / Logo ve Dil Seçici Konteyneri */
+    /* Dil seçiciyi ve logoyu yukarı yapıştır ve ortala */
     .header-container {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        margin-bottom: 0.5rem;
+        margin-top: 0rem !important;
+        margin-bottom: 0rem !important;
+    }
+
+    /* Streamlit'in kendi element boşluklarını daralt */
+    div.element-container {
+        margin-bottom: 0.2rem !important;
     }
 
     /* Form Kart Yapısı */
@@ -47,8 +54,9 @@ st.markdown("""
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
         border-radius: 16px !important;
-        padding: 1.5rem !important;
+        padding: 1.2rem !important;
         box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
+        margin-top: 0.2rem !important;
     }
 
     div[data-testid="stForm"] label p {
@@ -73,19 +81,19 @@ st.markdown("""
         box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.12) !important;
     }
 
-    /* Butonlar - Tam Genişlik ve Dengeli Duruş */
+    /* Butonlar */
     .stButton>button, div[data-testid="stForm"] button {
         background: linear-gradient(135deg, #0066FF 0%, #0047FF 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: 10px !important;
-        height: 3.2rem !important;
+        height: 3.1rem !important;
         font-weight: 600 !important;
         font-size: 1rem !important;
         box-shadow: 0 4px 14px rgba(0, 102, 255, 0.3) !important;
         transition: all 0.2s ease !important;
         width: 100% !important;
-        margin-top: 0.5rem !important;
+        margin-top: 0.3rem !important;
     }
     .stButton>button:hover, div[data-testid="stForm"] button:hover {
         transform: translateY(-1px) !important;
@@ -102,8 +110,8 @@ st.markdown("""
         background: #EFF6FF;
         border-left: 4px solid #0066FF;
         border-radius: 12px;
-        padding: 1.2rem;
-        margin-top: 1rem;
+        padding: 1rem;
+        margin-top: 0.8rem;
         color: #1E40AF;
         font-size: 0.9rem;
         line-height: 1.5;
@@ -163,7 +171,7 @@ I18N = {
         ],
         "send_btn": "Bildirimi Gönder",
         "waiting": "Talep gönderildi. Yanıt gelene kadar lütfen sayfayı açık tutunuz.",
-        "done": "Sürücü yanıt verdi, sayfayi kapatabilirsiniz.",
+        "done": "Sürücü yanıt verdi, sayfayı kapatabilirsiniz.",
         "btn_coming": "Geliyorum (2 dk)",
         "btn_moving": "Aracı Çekiyorum",
         "btn_busy": "Gelemiyorum / Müsait Değilim",
@@ -252,15 +260,15 @@ I18N = {
     }
 }
 
-# Dil Seçici ve Logo Entegre Alanı (Kompakt ve Ortalı)
+# Dil Seçici ve Logo Entegre Alanı (Üst Kısımdan Başlayan Kompakt Yapı)
 selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
 txt = I18N[selected_lang]
 
 st.markdown("<div class='header-container'>", unsafe_allow_html=True)
 if os.path.exists("logo.PNG"):
-    st.image("logo.PNG", width=160)
+    st.image("logo.PNG", width=150)
 elif os.path.exists("logo.png"):
-    st.image("logo.png", width=160)
+    st.image("logo.png", width=150)
 else:
     st.title(txt["title"])
 st.caption(txt["subtitle"])
@@ -406,14 +414,12 @@ if qr_vehicle_id:
 else:
     st.subheader(txt["reg_header"])
     st.caption(txt["reg_sub"])
-    st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
 
     with st.form("vehicle_registration_form"):
         plate_input = st.text_input(txt["plate_label"], placeholder=txt["plate_holder"])
         phone_input = st.text_input(txt["phone_label"], placeholder=txt["phone_holder"])
         chat_id_input = st.text_input(txt["chat_id_label"], placeholder=txt["chat_id_holder"])
         
-        st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
         submit_btn = st.form_submit_button(txt["submit_btn"])
 
     if submit_btn:
