@@ -12,7 +12,7 @@ import os
 # ---------------------------------------------------------
 st.set_page_config(page_title="CekCekQR - Global Park İletişimi", page_icon="🚗", layout="centered")
 
-# Modern Premium SaaS CSS Tasarımı (Mobil Uyumlu & Ortalı Logo)
+# Modern Premium SaaS CSS Tasarımı
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -32,7 +32,6 @@ st.markdown("""
         max-width: 580px;
     }
 
-    /* Logoyu ve Dil Seçiciyi Ortala */
     .centered-container {
         display: flex;
         flex-direction: column;
@@ -42,7 +41,6 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
 
-    /* Form Kart Yapısı */
     div[data-testid="stForm"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
@@ -51,14 +49,12 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
     }
 
-    /* Form Etiketlerini (Label) Belirgin ve Okunabilir Yapma */
     div[data-testid="stForm"] label p {
         color: #1E293B !important;
         font-weight: 600 !important;
         font-size: 0.95rem !important;
     }
 
-    /* Input Alanları */
     .stTextInput input {
         border-radius: 10px !important;
         border: 1.5px solid #CBD5E1 !important;
@@ -74,7 +70,6 @@ st.markdown("""
         box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.12) !important;
     }
 
-    /* Butonlar - Taşmayı Önleyen Tam Genişlik */
     .stButton>button, div[data-testid="stForm"] button {
         background: linear-gradient(135deg, #0066FF 0%, #0047FF 100%) !important;
         color: #FFFFFF !important;
@@ -253,8 +248,16 @@ I18N = {
     }
 }
 
-# Dil Seçici (Üst Kısımda Şık ve Ortalanmış)
+# Dil Seçici (En başta tanımlandı)
 col_center = st.container()
+with col_center:
+    st.markdown("<div class='centered-container'>", unsafe_allow_html=True)
+    selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+txt = I18N[selected_lang]
+
+# Logo ve Başlık Ortalanmış Alan
 with col_center:
     st.markdown("<div class='centered-container'>", unsafe_allow_html=True)
     if os.path.exists("logo.PNG"):
@@ -264,11 +267,7 @@ with col_center:
     else:
         st.title(txt["title"])
     st.caption(txt["subtitle"])
-    
-    selected_lang = st.selectbox("🌐 Language", ["TR", "EN", "RU"], index=0, label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
-
-txt = I18N[selected_lang]
 
 def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
     if not TELEGRAM_BOT_TOKEN or not chat_id:
