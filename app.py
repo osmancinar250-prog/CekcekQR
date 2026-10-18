@@ -120,4 +120,5 @@ supabase = init_supabase()
 I18N = {
     "TR": {
         "title": "CekCekQR",
-        "subtitle": "Çift Yönlü Anlık Park İletiş
+        "subtitle": "Cift Yonlu Anlik Park Iletisim Sistemi",
+        "reg_header": "📝
