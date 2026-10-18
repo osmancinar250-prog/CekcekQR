@@ -5,6 +5,7 @@ from supabase import create_client
 import requests
 import datetime
 import time
+import json
 
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
@@ -15,7 +16,6 @@ SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
 
-# Kendi Streamlit uygulama adresiniz
 APP_BASE_URL = "https://cekcekqr-e5lnv5nfat5q7spkrdvkes.streamlit.app"
 
 @st.cache_resource
@@ -42,12 +42,64 @@ def send_telegram_message(chat_id, text):
         return False
 
 # ---------------------------------------------------------
-# URL PARAMETRELERİ KONTROLÜ
+# URL PARAMETRELERİ & TELEGRAM WEBHOOK DİNLEYİCİSİ
 # ---------------------------------------------------------
 query_params = st.query_params
 qr_vehicle_id = query_params.get("v", None)
 reply_notif_id = query_params.get("reply", None)
 reply_action = query_params.get("action", None)
+is_webhook = query_params.get("webhook", None)
+
+# TELEGRAM BOTUNDAN GELEN /kayit KOMUTLARINI OTOMATİK YAKALAMA
+if is_webhook:
+    try:
+        # Telegram'dan gelen POST verisini oku
+        raw_body = st.context.request.body.decode("utf-8")
+        data = json.loads(raw_body)
+        
+        message = data.get("message", {})
+        text = message.get("text", "").strip()
+        chat_id = message.get("chat", {}).get("id")
+
+        if text.startswith("/start"):
+            welcome_msg = (
+                "👋 *CekCekQR'a Hoş Geldiniz!*\n\n"
+                "Aracınızı kaydetmek için plaka ve telefon numaranızı şu formatta gönderin:\n\n"
+                "`/kayit 34ABC123 05XXXXXXXXX`"
+            )
+            send_telegram_message(chat_id, welcome_msg)
+
+        elif text.startswith("/kayit"):
+            parts = text.split()
+            if len(parts) >= 3:
+                plate = parts[1].upper().replace(" ", "")
+                phone = parts[2].strip()
+                
+                # Supabase'e Kaydet
+                if supabase:
+                    v_data = {
+                        "plate": plate,
+                        "phone": phone,
+                        "telegram_chat_id": str(chat_id)
+                    }
+                    res = supabase.table("vehicles").insert(v_data).execute()
+                    if res.data:
+                        v_id = res.data[0]["id"]
+                        qr_link = f"{APP_BASE_URL}/?v={v_id}"
+                        send_telegram_message(
+                            chat_id, 
+                            f"✅ *Kayıt Başarılı!*\n\n"
+                            f"🚗 *Plaka:* {plate}\n"
+                            f"📱 *Telefon:* {phone}\n\n"
+                            f"🔗 *QR Kod Bağlantınız:*\n{qr_link}"
+                        )
+                    else:
+                        send_telegram_message(chat_id, "❌ Kayıt yapılırken bir hata oluştu.")
+            else:
+                send_telegram_message(chat_id, "⚠️ *Eksik bilgi!* Lütfen şu formatta yazın:\n`/kayit 34ABC123 05XXXXXXXXX`")
+    except Exception:
+        pass
+    st.stop()
 
 # ---------------------------------------------------------
 # SENARYO C: ARAÇ SAHİBİ YANIT LİNKİNE TIKLADIYSA
@@ -56,14 +108,11 @@ if reply_notif_id and reply_action:
     st.title("🚗 CekCekQR - Yanıt Onayı")
     if supabase:
         try:
-            # Durumu veritabanında güncelle
             supabase.table("notifications").update({"status": reply_action}).eq("id", reply_notif_id).execute()
-            
             if "Gelemiyorum" in reply_action:
                 st.warning(f"⚠️ Yanıtınız iletildi: **{reply_action}**")
             else:
                 st.success(f"✅ Yanıtınız başarıyla kaydedildi: **{reply_action}**")
-                
             st.info("Bu pencereyi kapatabilirsiniz. Vatandaş bilgilendirildi.")
         except Exception as e:
             st.error(f"Güncelleme hatası: {e}")
@@ -109,7 +158,6 @@ if qr_vehicle_id:
             if st.button("🚨 Bildirimi Gönder"):
                 if sender_phone.strip():
                     try:
-                        # 1. Bildirimi Veritabanına Ekle
                         notif_data = {
                             "vehicle_id": qr_vehicle_id,
                             "incoming_preset": selected_msg,
@@ -123,7 +171,6 @@ if qr_vehicle_id:
                             new_notif_id = insert_res.data[0]["id"]
                             st.session_state.active_notif_id = new_notif_id
                             
-                            # 2. Telegram Üzerinden Yanıt Linkleriyle Birlikte Gönder
                             telegram_chat_id = vehicle.get("telegram_chat_id")
                             if telegram_chat_id:
                                 link_geliyorum = f"{APP_BASE_URL}/?reply={new_notif_id}&action=🏃%20Geliyorum+(2+dk)"
@@ -135,7 +182,7 @@ if qr_vehicle_id:
                                     f"🚗 *Plaka:* {vehicle['plate']}\n"
                                     f"💬 *Mesaj:* {selected_msg}\n\n"
                                     f"👇 *Durumunuzu bildirmek için tıklayın:*\n"
-                                    f"[🏃 Geliyorum (3 dk)]({link_geliyorum})\n"
+                                    f"[🏃 Geliyorum (2 dk)]({link_geliyorum})\n"
                                     f"[🚗 Aracı Çekiyorum]({link_cekiyorum})\n"
                                     f"[❌ Gelemiyorum / Müsait Değilim]({link_gelemiyorum})"
                                 )
@@ -152,8 +199,7 @@ if qr_vehicle_id:
             st.info("📡 Bildirim araç sahibine iletildi. Yanıtı bekleniyor...")
             status_placeholder = st.empty()
             
-            # Durum döngüsü (Her 3 saniyede bir Supabase'i kontrol eder)
-            for _ in range(60): # 3 dakika boyunca canlı sorgular
+            for _ in range(60):
                 try:
                     check_res = supabase.table("notifications").select("status").eq("id", st.session_state.active_notif_id).execute()
                     if check_res.data:
@@ -182,43 +228,8 @@ if qr_vehicle_id:
         st.error("Geçersiz veya veritabanında bulunmayan QR Kod.")
 
 # ---------------------------------------------------------
-# SENARYO B: ARAÇ SAHİBİ PANELİ (Kayıt & QR Üretme)
+# SENARYO B: MANUEL KAYIT (YEDEK)
 # ---------------------------------------------------------
 else:
-    st.subheader("📝 Araç Kaydı & QR Kod Oluştur")
-    
-    plate = st.text_input("Plakanız:", placeholder="34ABC123").upper().replace(" ", "")
-    phone = st.text_input("Telefon Numaranız (Yasal Doğrulama):", placeholder="05XXXXXXXXX")
-    
-    st.markdown("---")
-    st.markdown("### 📲 Kilit Ekranı Bildirimi İçin Telegram Eşleşmesi")
-    st.info("Kilit ekranında bildirim alabilmek için Telegram Botumuza (`@cekcekqr_bot`) tıkla, `/start` de ve `@userinfobot`'tan öğrendiğin Chat ID numaranı buraya yaz.")
-    
-    chat_id_input = st.text_input("Telegram Chat ID (Örn: 5967362766):")
-
-    if st.button("QR Kod Oluştur"):
-        if plate and phone and chat_id_input:
-            if supabase:
-                try:
-                    v_data = {
-                        "plate": plate, 
-                        "phone": phone.strip(),
-                        "telegram_chat_id": chat_id_input.strip()
-                    }
-                    res = supabase.table("vehicles").insert(v_data).execute()
-                    
-                    if res.data:
-                        new_id = res.data[0]["id"]
-                        app_url = f"{APP_BASE_URL}/?v={new_id}"
-                        
-                        qr = qrcode.make(app_url)
-                        buf = BytesIO()
-                        qr.save(buf)
-                        
-                        st.success(f"✅ {plate} plakalı araç başarıyla kaydedildi!")
-                        st.image(buf.getvalue(), caption=f"{plate} QR Kodu", width=250)
-                        st.download_button("QR Kodu İndir", buf.getvalue(), file_name=f"{plate}_QR.png", mime="image/png")
-                except Exception as e:
-                    st.error(f"Kayıt Hatası: {e}")
-        else:
-            st.warning("Lütfen plaka, telefon ve Telegram Chat ID alanlarının tamamını doldurunuz.")
+    st.subheader("📲 Kolay Kayıt Yöntemi (Telegram)")
+    st.info("Sayısal ID kopyalamanıza gerek kalmadan kayıt olmak için Telegram botumuza gidin:\n\n**@cekcekqr_bot** hesabına şu mesajı atın:\n`/kayit 34ABC123 05XXXXXXXXX`")
