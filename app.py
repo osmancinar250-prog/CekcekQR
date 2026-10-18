@@ -28,12 +28,28 @@ def init_supabase():
 
 supabase = init_supabase()
 
-def send_telegram_message(chat_id, text):
-    """Telegram API üzerinden bildirim mesajı gönderir."""
+def send_telegram_inline_keyboard(chat_id, text, reply_notif_id):
+    """Telegram API üzerinden devasa önizleme olusturmayan şık Inline Butonlar gönderir."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    
+    # URL önizlemesini kapatmak için disable_web_page_preview=True ekliyoruz
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+        "reply_markup": {
+            "inline_keyboard": [
+                [{"text": "🏃 Geliyorum (2 dk)", "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action=🏃%20Geliyorum+(2+dk)"}],
+                [{"text": "🚗 Aracı Çekiyorum", "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action=🚗%20Aracı%20Çekiyorum"}],
+                [{"text": "❌ Gelemiyorum / Müsait Değilim", "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action=❌%20Gelemiyorum%20/%20Müsait%20Değilim"}]
+            ]
+        }
+    }
+    
     try:
         res = requests.post(url, json=payload, timeout=5)
         return res.status_code == 200
@@ -120,20 +136,13 @@ if qr_vehicle_id:
                             
                             telegram_chat_id = vehicle.get("telegram_chat_id")
                             if telegram_chat_id:
-                                link_geliyorum = f"{APP_BASE_URL}/?reply={new_notif_id}&action=🏃%20Geliyorum+(2+dk)"
-                                link_cekiyorum = f"{APP_BASE_URL}/?reply={new_notif_id}&action=🚗%20Aracı%20Çekiyorum"
-                                link_gelemiyorum = f"{APP_BASE_URL}/?reply={new_notif_id}&action=❌%20Gelemiyorum%20/%20Müsait%20Değilim"
-
                                 msg_text = (
                                     f"🚨 *CekCekQR BİLDİRİMİ!*\n\n"
                                     f"🚗 *Plaka:* {vehicle['plate']}\n"
                                     f"💬 *Mesaj:* {selected_msg}\n\n"
-                                    f"👇 *Durumunuzu bildirmek için tıklayın:*\n"
-                                    f"[🏃 Geliyorum (2 dk)]({link_geliyorum})\n"
-                                    f"[🚗 Aracı Çekiyorum]({link_cekiyorum})\n"
-                                    f"[❌ Gelemiyorum / Müsait Değilim]({link_gelemiyorum})"
+                                    f"👇 *Durumunuzu bildirmek için butona tıklayın:*"
                                 )
-                                send_telegram_message(telegram_chat_id, msg_text)
+                                send_telegram_inline_keyboard(telegram_chat_id, msg_text, new_notif_id)
                             
                             st.rerun()
                     except Exception as e:
@@ -231,4 +240,4 @@ else:
             st.warning("Lütfen tüm alanları doldurunuz.")
 
     st.markdown("---")
-    st.info("💡 **Telegram Chat ID'nizi nasıl öğrenirsiniz?**\n\nTelegram'dan **@cekcekqr_bot** botumuza herhangi bir mesaj atın, Chat ID'nizi otomatik yanıt alabilirsiniz.")
+    st.info("💡 **Telegram Chat ID'nizi nasıl öğrenirsiniz?**\n\nTelegram'dan **@cekcekqr_bot** botumuza herhangi bir mesaj atın, Chat ID'nizi otomatik yanıt olarak alabilirsiniz.")
