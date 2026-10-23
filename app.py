@@ -21,7 +21,7 @@ def get_image_base64(file_path):
 
 logo_src = get_image_base64("logo.PNG") or get_image_base64("logo.png")
 
-# CSS Stilleri (Radyo buton metin görünürlük düzeltmesi eklendi)
+# CSS Stilleri (Radyo buton ve metin kutusu etiket görünürlük düzeltmesi eklendi)
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -121,6 +121,17 @@ div[data-testid="stForm"] label p {
     font-weight: 600 !important;
     font-size: 0.88rem !important;
     margin-bottom: 2px !important;
+}
+
+/* Metin Kutusu Etiketleri (Label) Görünürlük Düzeltmesi */
+div[data-testid="stTextInput"] label p,
+div[data-testid="stTextInput"] label span,
+div[data-testid="stWidgetLabel"] p {
+    color: #0F172A !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* Radio Button Metin Görünürlük Düzeltmesi */
