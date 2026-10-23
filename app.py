@@ -7,6 +7,7 @@ import datetime
 import time
 import os
 import base64
+import re
 
 # ---------------------------------------------------------
 # SETUP & CONFIGURATION
@@ -207,6 +208,11 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# Telefon format doğrulama fonksiyonu
+def is_valid_phone(phone_str):
+    clean_phone = re.sub(r'\D', '', phone_str)
+    return len(clean_phone) >= 10 and len(clean_phone) <= 13
+
 I18N = {
     "TR": {
         "title": "CekCekQR",
@@ -219,6 +225,8 @@ I18N = {
         "phone_holder": "Örn: +905XXXXXXXXX",
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "Örn: 123456789",
+        "token_label": "Aktivasyon Kodu (Satın Alınan Lisans)",
+        "token_holder": "Örn: CEK-2026",
         "submit_btn": "Kaydol ve QR Kod Üret",
         "chat_id_info": "Telegram Chat ID'nizi nasıl öğrenirsiniz?<br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza mesaj atarak Chat ID'nizi anında öğrenebilirsiniz.",
         "notify_header": "Araç Sahibine Bildirim Gönder",
@@ -236,6 +244,7 @@ I18N = {
         "btn_coming": "Geliyorum (2 dk)",
         "btn_moving": "Aracı Çekiyorum",
         "btn_busy": "Gelemiyorum / Müsait Değilim",
+        "btn_block": "🚫 Bu Numarayı Engelle",
         "tg_title": "CekCekQR BİLDİRİMİ!",
         "tg_plate": "Plaka:",
         "tg_msg": "Mesaj:",
@@ -243,7 +252,11 @@ I18N = {
         "reply_title": "CekCekQR - Yanıt Onayı",
         "reply_success": "Yanıtınız kaydedildi:",
         "reply_close": "Bu pencereyi kapatabilirsiniz.",
-        "invalid_qr": "Geçersiz veya veritabanında bulunmayan QR Kod."
+        "invalid_qr": "Geçersiz veya veritabanında bulunmayan QR Kod.",
+        "err_duplicate_plate": "Bu plaka sistemde zaten kayıtlı!",
+        "err_invalid_token": "Geçersiz veya hatalı Aktivasyon Kodu!",
+        "err_invalid_phone": "Lütfen geçerli ve doğru bir telefon numarası giriniz.",
+        "err_blocked": "Bu numaradan bu plakaya bildirim gönderimi engellenmiştir."
     },
     "EN": {
         "title": "CekCekQR",
@@ -256,6 +269,8 @@ I18N = {
         "phone_holder": "e.g., +1234567890",
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "e.g., 123456789",
+        "token_label": "Activation Code",
+        "token_holder": "e.g., CEK-2026",
         "submit_btn": "Register & Generate QR Code",
         "chat_id_info": "How to get your Telegram Chat ID?<br>Send any message to <strong>@cekcekqr_bot</strong> on Telegram to get your Chat ID instantly.",
         "notify_header": "Notify Vehicle Owner",
@@ -273,6 +288,7 @@ I18N = {
         "btn_coming": "On my way (2 min)",
         "btn_moving": "Moving the car",
         "btn_busy": "Not available / Cannot come",
+        "btn_block": "🚫 Block This Number",
         "tg_title": "CekCekQR NOTIFICATION!",
         "tg_plate": "Plate:",
         "tg_msg": "Message:",
@@ -280,7 +296,11 @@ I18N = {
         "reply_title": "CekCekQR - Response Confirmation",
         "reply_success": "Your response has been recorded:",
         "reply_close": "You can close this window.",
-        "invalid_qr": "Invalid or missing QR Code."
+        "invalid_qr": "Invalid or missing QR Code.",
+        "err_duplicate_plate": "This plate is already registered in the system!",
+        "err_invalid_token": "Invalid Activation Code!",
+        "err_invalid_phone": "Please enter a valid phone number.",
+        "err_blocked": "Notifications from this number to this plate are blocked."
     },
     "RU": {
         "title": "CekCekQR",
@@ -293,6 +313,8 @@ I18N = {
         "phone_holder": "Например: +79001234567",
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "Например: 123456789",
+        "token_label": "Код активации",
+        "token_holder": "Например: CEK-2026",
         "submit_btn": "Зарегистрироваться и получить QR",
         "chat_id_info": "Как узнать свой Telegram Chat ID?<br>Отправьте любое сообщение боту <strong>@cekcekqr_bot</strong> в Telegram, чтобы мгновенно получить ваш Chat ID.",
         "notify_header": "Уведомить владельца",
@@ -310,6 +332,7 @@ I18N = {
         "btn_coming": "Иду (2 мин)",
         "btn_moving": "Переставляю машину",
         "btn_busy": "Не могу подойти",
+        "btn_block": "🚫 Заблокировать номер",
         "tg_title": "CekCekQR УВЕДОМЛЕНИЕ!",
         "tg_plate": "Номер:",
         "tg_msg": "Сообщение:",
@@ -317,7 +340,11 @@ I18N = {
         "reply_title": "CekCekQR - Подтверждение ответа",
         "reply_success": "Ваш ответ записан:",
         "reply_close": "Вы можете закрыть это окно.",
-        "invalid_qr": "Недействительный QR-код."
+        "invalid_qr": "Недействительный QR-код.",
+        "err_duplicate_plate": "Этот номер уже зарегистрирован!",
+        "err_invalid_token": "Неверный код активации!",
+        "err_invalid_phone": "Введите действительный номер телефона.",
+        "err_blocked": "Уведомления с этого номера заблокированы."
     }
 }
 
@@ -344,7 +371,8 @@ def send_telegram_inline_keyboard(chat_id, text, reply_notif_id, lang_dict):
             "inline_keyboard": [
                 [{"text": lang_dict["btn_coming"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_coming']}"}],
                 [{"text": lang_dict["btn_moving"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_moving']}"}],
-                [{"text": lang_dict["btn_busy"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_busy']}"}]
+                [{"text": lang_dict["btn_busy"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action={lang_dict['btn_busy']}"}],
+                [{"text": lang_dict["btn_block"], "url": f"{APP_BASE_URL}/?reply={reply_notif_id}&action=BLOCK"}]
             ]
         }
     }
@@ -364,8 +392,13 @@ if reply_notif_id and reply_action:
     st.title(txt["reply_title"])
     if supabase:
         try:
-            supabase.table("notifications").update({"status": reply_action}).eq("id", reply_notif_id).execute()
-            st.success(f"{txt['reply_success']} **{reply_action}**")
+            if reply_action == "BLOCK":
+                # Engelleme işlemi tetiklendiğinde durum güncellenir
+                supabase.table("notifications").update({"status": "ENGELLENDI"}).eq("id", reply_notif_id).execute()
+                st.success("Bu numara başarıyla engellendi.")
+            else:
+                supabase.table("notifications").update({"status": reply_action}).eq("id", reply_notif_id).execute()
+                st.success(f"{txt['reply_success']} **{reply_action}**")
             st.info(txt["reply_close"])
         except Exception as e:
             st.error(f"Error: {e}")
@@ -393,36 +426,58 @@ if qr_vehicle_id:
             selected_msg = st.radio("Status:", txt["presets"])
 
             if st.button(txt["send_btn"]):
-                if sender_phone.strip():
+                clean_sender_phone = sender_phone.strip()
+                
+                # 1. Format ve Rastgele Numara Kontrolü
+                if not is_valid_phone(clean_sender_phone):
+                    st.warning(txt["err_invalid_phone"])
+                else:
                     try:
-                        notif_data = {
-                            "vehicle_id": qr_vehicle_id,
-                            "incoming_preset": selected_msg,
-                            "sender_phone": sender_phone.strip(),
-                            "status": "BEKLIYOR",
-                            "created_at": datetime.datetime.now().isoformat()
-                        }
-                        insert_res = supabase.table("notifications").insert(notif_data).execute()
+                        # 2. Zaman Sınırı (Cooldown) / Engelleme Kontrolü Altyapısı
+                        # Son 2 dakika içinde aynı numaradan bu araca bildirim atılmış mı kontrolü
+                        recent_check = supabase.table("notifications").select("*").eq("vehicle_id", qr_vehicle_id).eq("sender_phone", clean_sender_phone).order("created_at", desc=True).limit(1).execute()
                         
-                        if insert_res.data:
-                            new_notif_id = insert_res.data[0]["id"]
-                            st.session_state.active_notif_id = new_notif_id
+                        is_blocked = False
+                        if recent_check.data:
+                            last_notif = recent_check.data[0]
+                            if last_notif.get("status") == "ENGELLENDI":
+                                is_blocked = True
+                            else:
+                                # Zaman sınırı (Cooldown: 2 dakika)
+                                last_time = datetime.datetime.fromisoformat(last_notif["created_at"])
+                                if (datetime.datetime.now() - last_time).total_seconds() < 120:
+                                    st.warning("Lütfen aynı numaradan ard arda bildirim göndermeden önce biraz bekleyiniz (Zaman Sınırı).")
+                                    st.stop()
+
+                        if is_blocked:
+                            st.error(txt["err_blocked"])
+                        else:
+                            notif_data = {
+                                "vehicle_id": qr_vehicle_id,
+                                "incoming_preset": selected_msg,
+                                "sender_phone": clean_sender_phone,
+                                "status": "BEKLIYOR",
+                                "created_at": datetime.datetime.now().isoformat()
+                            }
+                            insert_res = supabase.table("notifications").insert(notif_data).execute()
                             
-                            telegram_chat_id = vehicle.get("telegram_chat_id")
-                            if telegram_chat_id:
-                                msg_text = (
-                                    f"*{txt['tg_title']}*\n\n"
-                                    f"*{txt['tg_plate']}* {vehicle['plate']}\n"
-                                    f"*{txt['tg_msg']}* {selected_msg}\n\n"
-                                    f"_{txt['tg_prompt']}_"
-                                )
-                                send_telegram_inline_keyboard(telegram_chat_id, msg_text, new_notif_id, txt)
-                            
-                            st.rerun()
+                            if insert_res.data:
+                                new_notif_id = insert_res.data[0]["id"]
+                                st.session_state.active_notif_id = new_notif_id
+                                
+                                telegram_chat_id = vehicle.get("telegram_chat_id")
+                                if telegram_chat_id:
+                                    msg_text = (
+                                        f"*{txt['tg_title']}*\n\n"
+                                        f"*{txt['tg_plate']}* {vehicle['plate']}\n"
+                                        f"*{txt['tg_msg']}* {selected_msg}\n\n"
+                                        f"_{txt['tg_prompt']}_"
+                                    )
+                                    send_telegram_inline_keyboard(telegram_chat_id, msg_text, new_notif_id, txt)
+                                
+                                st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
-                else:
-                    st.warning("Please enter phone number.")
         
         else:
             st.markdown(f"<div class='info-card'>{txt['waiting']}</div>", unsafe_allow_html=True)
@@ -434,7 +489,10 @@ if qr_vehicle_id:
                     if check_res.data:
                         current_status = check_res.data[0]["status"]
                         if current_status != "BEKLIYOR":
-                            status_placeholder.success(f"**{current_status}**")
+                            if current_status == "ENGELLENDI":
+                                status_placeholder.error("Bu işlem engellendi.")
+                            else:
+                                status_placeholder.success(f"**{current_status}**")
                             st.markdown(f"<div class='info-card'>{txt['done']}</div>", unsafe_allow_html=True)
                                 
                             if st.button("OK"):
@@ -461,41 +519,53 @@ else:
         plate_input = st.text_input(txt["plate_label"], placeholder=txt["plate_holder"])
         phone_input = st.text_input(txt["phone_label"], placeholder=txt["phone_holder"])
         chat_id_input = st.text_input(txt["chat_id_label"], placeholder=txt["chat_id_holder"])
+        token_input = st.text_input(txt["token_label"], placeholder=txt["token_holder"])
         
         submit_btn = st.form_submit_button(txt["submit_btn"])
 
     if submit_btn:
-        if plate_input and phone_input and chat_id_input:
+        if plate_input and phone_input and chat_id_input and token_input:
             clean_plate = plate_input.upper().replace(" ", "")
+            clean_token = token_input.strip().upper()
+            
             try:
-                v_data = {
-                    "plate": clean_plate,
-                    "phone": phone_input.strip(),
-                    "telegram_chat_id": chat_id_input.strip()
-                }
-                res = supabase.table("vehicles").insert(v_data).execute()
-                if res.data:
-                    new_id = res.data[0]["id"]
-                    st.success("Success!")
-                    
-                    qr_link = f"{APP_BASE_URL}/?v={new_id}"
-                    
-                    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-                    qr.add_data(qr_link)
-                    qr.make(fit=True)
-                    img = qr.make_image(fill_color="black", back_color="white")
-                    
-                    buf = BytesIO()
-                    img.save(buf, format="PNG")
-                    byte_im = buf.getvalue()
+                # 1. MÜKERRER PLAKA KONTROLÜ
+                dup_check = supabase.table("vehicles").select("*").eq("plate", clean_plate).execute()
+                if dup_check.data:
+                    st.error(txt["err_duplicate_plate"])
+                else:
+                    # 2. AKTİVASYON TOKEN KONTROLÜ (Erken erişim için 'CEK-2026' anahtarı)
+                    if clean_token != "CEK-2026":
+                        st.error(txt["err_invalid_token"])
+                    else:
+                        v_data = {
+                            "plate": clean_plate,
+                            "phone": phone_input.strip(),
+                            "telegram_chat_id": chat_id_input.strip()
+                        }
+                        res = supabase.table("vehicles").insert(v_data).execute()
+                        if res.data:
+                            new_id = res.data[0]["id"]
+                            st.success("Success!")
+                            
+                            qr_link = f"{APP_BASE_URL}/?v={new_id}"
+                            
+                            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                            qr.add_data(qr_link)
+                            qr.make(fit=True)
+                            img = qr.make_image(fill_color="black", back_color="white")
+                            
+                            buf = BytesIO()
+                            img.save(buf, format="PNG")
+                            byte_im = buf.getvalue()
 
-                    st.image(byte_im, caption=f"QR: {clean_plate}")
-                    st.download_button(
-                        label="Download QR",
-                        data=byte_im,
-                        file_name=f"CekCekQR_{clean_plate}.png",
-                        mime="image/png"
-                    )
+                            st.image(byte_im, caption=f"QR: {clean_plate}")
+                            st.download_button(
+                                label="Download QR",
+                                data=byte_im,
+                                file_name=f"CekCekQR_{clean_plate}.png",
+                                mime="image/png"
+                            )
             except Exception as e:
                 st.error(f"Error: {e}")
         else:
