@@ -22,7 +22,7 @@ def get_image_base64(file_path):
 
 logo_src = get_image_base64("logo.PNG") or get_image_base64("logo.png")
 
-# CSS Stilleri (Radyo buton ve metin kutusu etiket görünürlük düzeltmesi eklendi)
+# CSS Stilleri (Uyarı kutusu okunabilirlik düzeltmesi eklendi)
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -135,9 +135,14 @@ div[data-testid="stWidgetLabel"] p {
     opacity: 1 !important;
 }
 
-/* Uyarı ve Hata Kutusu Metin Rengi Düzeltmesi */
-div[data-testid="stNotification"] p {
-    color: #0F172A !important;
+/* Uyarı ve Hata Kutuları Okunabilirlik Düzeltmesi */
+div.stAlert, div[data-testid="stNotification"], div[data-baseweb="notification"] {
+    background-color: #FEF3C7 !important;
+    color: #92400E !important;
+    border: 1px solid #F59E0B !important;
+}
+div.stAlert p, div[data-testid="stNotification"] p, div[data-baseweb="notification"] p {
+    color: #92400E !important;
     font-weight: 600 !important;
 }
 
