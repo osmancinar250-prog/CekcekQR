@@ -22,7 +22,7 @@ def get_image_base64(file_path):
 
 logo_src = get_image_base64("logo.PNG") or get_image_base64("logo.png")
 
-# CSS Stilleri (Radyo buton ve metin kutusu etiket görünürlük düzeltmesi eklendi)
+# CSS Stilleri (Uyarı metni renk düzeltmesi dahil)
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -135,6 +135,12 @@ div[data-testid="stWidgetLabel"] p {
     opacity: 1 !important;
 }
 
+/* Uyarı ve Hata Kutusu Metin Rengi Düzeltmesi */
+div[data-testid="stNotification"] p {
+    color: #0F172A !important;
+    font-weight: 600 !important;
+}
+
 /* Radio Button Metin Görünürlük Düzeltmesi */
 div[class*="stRadio"] label p, div[class*="stRadio"] label span {
     color: #0F172A !important;
@@ -208,7 +214,6 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Telefon format doğrulama fonksiyonu
 def is_valid_phone(phone_str):
     clean_phone = re.sub(r'\D', '', phone_str)
     return len(clean_phone) >= 10 and len(clean_phone) <= 13
@@ -226,9 +231,9 @@ I18N = {
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "Örn: 123456789",
         "token_label": "Aktivasyon Kodu (Satın Alınan Lisans)",
-        "token_holder": "Örn: CEK-ETSY-001",
+        "token_holder": "Örn: CEK-9X2M-7P4Q",
         "submit_btn": "Kaydol ve QR Kod Üret",
-        "chat_id_info": "Telegram Chat ID'nizi nasıl öğrenirsiniz?<br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza mesaj atarak Chat ID'nizi anında öğrenebilirsiniz.",
+        "chat_id_info": "💡 <strong>Telegram Chat ID'nizi nasıl öğrenirsiniz?</strong><br>Telegram'dan <strong>@cekcekqr_bot</strong> botumuza tıklayın. Bota <strong>/start</strong> veya herhangi bir mesaj yazdığınızda Chat ID'niz anında iletilecektir.",
         "notify_header": "Araç Sahibine Bildirim Gönder",
         "verified": "Araç Doğrulandı:",
         "sender_phone": "Telefon Numaranız (Yasal doğrulama için):",
@@ -270,9 +275,9 @@ I18N = {
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "e.g., 123456789",
         "token_label": "Activation Code",
-        "token_holder": "e.g., CEK-ETSY-001",
+        "token_holder": "e.g., CEK-9X2M-7P4Q",
         "submit_btn": "Register & Generate QR Code",
-        "chat_id_info": "How to get your Telegram Chat ID?<br>Send any message to <strong>@cekcekqr_bot</strong> on Telegram to get your Chat ID instantly.",
+        "chat_id_info": "💡 <strong>How to get your Telegram Chat ID?</strong><br>Open <strong>@cekcekqr_bot</strong> on Telegram. Send <strong>/start</strong> or any message to get your Chat ID instantly.",
         "notify_header": "Notify Vehicle Owner",
         "verified": "Vehicle Verified:",
         "sender_phone": "Your Phone Number (For verification):",
@@ -314,9 +319,9 @@ I18N = {
         "chat_id_label": "Telegram Chat ID",
         "chat_id_holder": "Например: 123456789",
         "token_label": "Код активации",
-        "token_holder": "Например: CEK-ETSY-001",
+        "token_holder": "Например: CEK-9X2M-7P4Q",
         "submit_btn": "Зарегистрироваться и получить QR",
-        "chat_id_info": "Как узнать свой Telegram Chat ID?<br>Отправьте любое сообщение боту <strong>@cekcekqr_bot</strong> в Telegram, чтобы мгновенно получить ваш Chat ID.",
+        "chat_id_info": "💡 <strong>Как узнать свой Telegram Chat ID?</strong><br>Откройте бота <strong>@cekcekqr_bot</strong> в Telegram. Отправьте <strong>/start</strong> или любое сообщение, чтобы мгновенно получить ваш Chat ID.",
         "notify_header": "Уведомить владельца",
         "verified": "Автомобиль подтвержден:",
         "sender_phone": "Ваш номер телефона:",
