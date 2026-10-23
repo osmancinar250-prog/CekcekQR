@@ -1,21 +1,21 @@
 import streamlit as st
 
-# Sayfa Yapılandırması
+# 1. SAYFA YAPILANDIRMASI
 st.set_page_config(
-    page_title="CekCekQR - Anlık Park İletişim Sistemi",
+    page_title="CekCekQR - Park İletişim Sistemi",
     page_icon="🚗",
     layout="centered"
 )
 
-# 1. CSS STİLLERİ (Kontrast ve Görsel Hataların Çözümü)
+# 2. CSS STİLLERİ (Mevcut yapıyı bozmadan sadece görünmez metinleri ve kontrastı düzeltir)
 custom_css = """
 <style>
-/* Arka planı temiz beyaz tutalım */
+/* Arka plan temizliği */
 .stApp {
     background-color: #FFFFFF;
 }
 
-/* Form Etiketleri (Telefon Numarası Giriniz vb.) ve Yardımcı Metinler */
+/* Telefon Numarası, Etiketler (Labels) ve Açıklama Metinlerini Simsiyah Yap */
 div[data-testid="stTextInput"] label,
 div[data-testid="stTextInput"] label p,
 div[data-testid="stWidgetLabel"] p,
@@ -24,20 +24,19 @@ div[data-testid="stWidgetLabel"] p,
 span[data-baseweb="typo-caption"] {
     color: #0F172A !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.92rem !important;
     opacity: 1 !important;
     visibility: visible !important;
 }
 
-/* Radio Button Başlığı ve Seçenek Metinleri */
+/* Radio Button "Status:" Başlığı ve Seçenek Metinleri */
 div[class*="stRadio"] label p, 
 div[class*="stRadio"] label span {
     color: #0F172A !important;
     font-weight: 600 !important;
-    font-size: 0.9rem !important;
 }
 
-/* İnput Kutusu İç Yazısı (Placeholder/Text) */
+/* Input Kutusu İçi ve Sınırları */
 div[data-testid="stTextInput"] input {
     color: #0F172A !important;
     background-color: #F8FAFC !important;
@@ -62,11 +61,8 @@ div[data-testid="stTextInput"] input {
     background-color: #1D4ED8 !important;
 }
 
-/* Yeşil Onay Kutusu İyileştirmesi */
+/* Onay ve Bilgi Kutusu Renk Düzenlemesi */
 .stAlert {
-    background-color: #DCFCE7 !important;
-    color: #166534 !important;
-    border: 1px solid #86EFAC !important;
     border-radius: 8px !important;
 }
 </style>
@@ -74,54 +70,88 @@ div[data-testid="stTextInput"] input {
 
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# 2. BAŞLIK VE LOGO ALANI
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    # Logo veya başlık görseli (Varsa st.image eklenebilir)
-    st.markdown("<h2 style='text-align: center; color: #1E293B; margin-bottom: 0;'>CekCekQR</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B; font-size: 0.85rem;'>Çift Yönlü Anlık Park İletişim Sistemi</p>", unsafe_allow_html=True)
+# 3. DİL SEÇİMİ (Language Selector)
+lang = st.selectbox("", ["TR", "EN"], index=0, label_visibility="collapsed")
 
-st.markdown("---")
+# Dil Sözlüğü (I18N)
+texts = {
+    "TR": {
+        "subtitle": "Çift Yönlü Anlık Park İletişim Sistemi",
+        "title": "Araç Sahibine Bildirim Gönder",
+        "verified": "Araç Doğrulandı:",
+        "phone_label": "Telefon Numaranız (Yasal doğrulama için):",
+        "phone_help": "Spam ve asılsız bildirimleri önlemek amacıyla numaranız kayıt altına alınır.",
+        "phone_placeholder": "05XXXXXXXXX",
+        "status_label": "Status / Durum:",
+        "presets": [
+            "🚨 Aracınız geçişi/çıkışı engelliyor.",
+            "💡 Aracınızın farları açık kaldı.",
+            "🪟 Aracınızın camı açık kaldı.",
+            "💥 Aracınıza temas/hasar gerçekleşti."
+        ],
+        "btn_send": "Bildirimi Gönder",
+        "err_phone": "Lütfen geçerli bir telefon numarası giriniz!",
+        "success_msg": "Bildirim araç sahibine Telegram üzerinden iletildi! Duyarlılığınız için teşekkür ederiz."
+    },
+    "EN": {
+        "subtitle": "Two-Way Instant Parking Communication System",
+        "title": "Send Notification to Vehicle Owner",
+        "verified": "Vehicle Verified:",
+        "phone_label": "Your Phone Number (Required for verification):",
+        "phone_help": "Your phone number is recorded to prevent spam and fake alerts.",
+        "phone_placeholder": "+905XXXXXXXXX",
+        "status_label": "Status:",
+        "presets": [
+            "🚨 Your vehicle is blocking the way.",
+            "💡 Your headlights are left on.",
+            "🪟 Your window is open.",
+            "💥 Vehicle impact/damage detected."
+        ],
+        "btn_send": "Send Notification",
+        "err_phone": "Please enter a valid phone number!",
+        "success_msg": "Notification sent to the owner via Telegram! Thank you for your courtesy."
+    }
+}
 
-# 3. ARAÇ DOĞRULAMA BİLGİSİ
-# Örnek Plaka Verisi (URL Parametresinden de Çekilebilir)
+txt = texts[lang]
+
+# 4. LOGO VE BAŞLIK ALANI
+# Logo görselin root dizindeyse 'logo.png' veya 'assets/logo.png' olarak çağırabilirsin.
+# st.image("logo.png", width=160)
+col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+with col_l2:
+    try:
+        st.image("logo.png", use_container_width=True)
+    except:
+        # Logo dosyası yoksa varsayılan metin gösterimi
+        st.markdown("<h2 style='text-align: center; color: #1E293B; margin-bottom: 0;'>CekCekQR</h2>", unsafe_allow_html=True)
+
+st.markdown(f"<p style='text-align: center; color: #64748B; font-size: 0.85rem; margin-top: -10px;'>{txt['subtitle']}</p>", unsafe_allow_html=True)
+
+# 5. ARAÇ DOĞRULAMA PLAKASI
 query_params = st.query_params
 vehicle_plate = query_params.get("plate", "34DFJ037")
 
-st.success(f"Araç Doğrulandı: **{vehicle_plate}**")
+st.markdown(f"### {txt['title']}")
+st.success(f"{txt['verified']} **{vehicle_plate}**")
 
-# 4. BİLDİRİM FORMU
-st.subheader("Araç Sahibine Bildirim Gönder")
-
-# Telefon Numarası Girişi (Artık net görünen label ile)
+# 6. BİLDİRİM FORMU
 sender_phone = st.text_input(
-    label="Telefon Numaranız (Yasal doğrulama için gereklidir):",
-    placeholder="05XXXXXXXXX",
-    help="Spam ve asılsız bildirimleri önlemek amacıyla numaranız kayıt altına alınır."
+    label=txt["phone_label"],
+    placeholder=txt["phone_placeholder"],
+    help=txt["phone_help"]
 )
 
-# Durum Seçenekleri
-presets = [
-    "🚨 Aracınız geçişi/çıkışı engelliyor.",
-    "💡 Aracınızın farları açık kaldı.",
-    "🪟 Aracınızın camı açık kaldı.",
-    "💥 Aracınıza temas/hasar gerçekleşti."
-]
-
 selected_msg = st.radio(
-    label="Durum / Bildirim Nedeni:",
-    options=presets,
+    label=txt["status_label"],
+    options=txt["presets"],
     index=0
 )
 
-# 5. GÖNDERİM BUTONU VE İŞLEM
-if st.button("Bildirimi Gönder"):
+# 7. GÖNDER BUTONU & BİLDİRİM AKIŞI
+if st.button(txt["btn_send"]):
     if not sender_phone or len(sender_phone.strip()) < 10:
-        st.error("Lütfen geçerli bir telefon numarası giriniz!")
+        st.error(txt["err_phone"])
     else:
-        # Telegram Deep Link / Bildirim Akışı
-        st.info("Bildiriminiz araç sahibine Telegram üzerinden anında iletiliyor...")
-        
-        # Başarılı Gönderim Ekranı
         st.balloons()
-        st.success("Bildirim araç sahibine iletildi! Duyarlılığınız için teşekkür ederiz.")
+        st.success(txt["success_msg"])
